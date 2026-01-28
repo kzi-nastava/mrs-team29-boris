@@ -1,33 +1,38 @@
 package com.example.backendspringboot.model;
 
 import jakarta.persistence.*;
-import lombok.Getter;
-import lombok.Setter;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 import java.time.LocalDateTime;
-import java.util.List;
 
-@Getter
-@Setter
 @Entity
-@DiscriminatorValue("PASSENGER")
-public class Passenger extends User {
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
+public class Review {
 
-    @ManyToMany
-    @JoinTable(
-            name = "passenger_favorite_routes",
-            joinColumns = @JoinColumn(name = "passenger_id"),
-            inverseJoinColumns = @JoinColumn(name = "route_id")
-    )
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    private Long id;
 
-    private List<Route> favoriteRoutes;
+    @ManyToOne
+    @JoinColumn(name = "passenger_id")
+    private Passenger passenger;
+
+    @ManyToOne
+    @JoinColumn(name = "ride_id")
+    private Ride ride;
 
     @Column(nullable = false)
-    private boolean activated = false;
+    private int driverRating;
 
-    @Column(unique = true)
-    private String activationToken;
+    @Column(nullable = false)
+    private int vehicleRating;
 
-    @Column
-    private LocalDateTime activationTokenExpiry;
+    @Column(length = 500)
+    private String comment;
+
+    private LocalDateTime creationTime;
 }
