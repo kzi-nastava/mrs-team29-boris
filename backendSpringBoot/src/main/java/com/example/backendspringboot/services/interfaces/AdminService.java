@@ -1,4 +1,4 @@
-package com.example.backendspringboot.services.interfaces;
+package com.example.demo.services.interfaces;
 
 import com.example.demo.dto.response.AdminRideHistoryResponseDTO;
 import com.example.demo.dto.response.AdminUserResponseDTO;
