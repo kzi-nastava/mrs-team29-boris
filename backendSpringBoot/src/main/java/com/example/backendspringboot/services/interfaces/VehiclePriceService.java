@@ -1,6 +1,6 @@
-package com.example.demo.services.interfaces;
+package com.example.backendspringboot.services.interfaces;
 
-import com.example.demo.dto.VehiclePriceDTO;
+import com.example.backendspringboot.dto.VehiclePriceDTO;
 
 public interface VehiclePriceService {
     public VehiclePriceDTO getPrices();

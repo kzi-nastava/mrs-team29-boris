@@ -1,9 +1,9 @@
-package com.example.demo.services.interfaces;
+package com.example.backendspringboot.services.interfaces;
 
-import com.example.demo.dto.request.*;
-import com.example.demo.dto.response.*;
-import com.example.demo.model.Ride;
-import com.example.demo.model.VehiclePrice;
+import com.example.backendspringboot.dto.request.*;
+import com.example.backendspringboot.dto.response.*;
+import com.example.backendspringboot.model.Ride;
+import com.example.backendspringboot.model.VehiclePrice;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 

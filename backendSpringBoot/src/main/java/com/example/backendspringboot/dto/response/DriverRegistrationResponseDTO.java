@@ -1,6 +1,6 @@
-package com.example.demo.dto.response;
+package com.example.backendspringboot.dto.response;
 
-import com.example.demo.model.DriverStatus;
+import com.example.backendspringboot.model.DriverStatus;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;

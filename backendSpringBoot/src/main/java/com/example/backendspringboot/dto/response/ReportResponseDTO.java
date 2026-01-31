@@ -1,7 +1,7 @@
-package com.example.demo.dto.response;
+package com.example.backendspringboot.dto.response;
 
-import com.example.demo.dto.DailyStatsDTO;
-import com.example.demo.dto.SummaryStatsDTO;
+import com.example.backendspringboot.dto.DailyStatsDTO;
+import com.example.backendspringboot.dto.SummaryStatsDTO;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;

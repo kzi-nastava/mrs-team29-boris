@@ -1,6 +1,6 @@
-package com.example.demo.dto.request;
+package com.example.backendspringboot.dto.request;
 
-import com.example.demo.model.VehicleType;
+import com.example.backendspringboot.model.VehicleType;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;

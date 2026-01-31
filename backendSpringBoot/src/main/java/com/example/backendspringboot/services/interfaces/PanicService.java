@@ -1,7 +1,7 @@
-package com.example.demo.services.interfaces;
+package com.example.backendspringboot.services.interfaces;
 
-import com.example.demo.dto.request.PanicRequestDTO;
-import com.example.demo.dto.response.PanicResponseDTO;
+import com.example.backendspringboot.dto.request.PanicRequestDTO;
+import com.example.backendspringboot.dto.response.PanicResponseDTO;
 
 import java.util.List;
 

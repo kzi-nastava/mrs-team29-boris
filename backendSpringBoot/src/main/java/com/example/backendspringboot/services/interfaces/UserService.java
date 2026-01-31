@@ -1,13 +1,13 @@
-package com.example.demo.services.interfaces;
+package com.example.backendspringboot.services.interfaces;
 
-import com.example.demo.dto.request.ChangePasswordRequest;
-import com.example.demo.dto.request.LoginRequestDTO;
-import com.example.demo.dto.request.UpdateUserProfileRequestDTO;
-import com.example.demo.dto.request.UserRegistrationRequestDTO;
-import com.example.demo.dto.response.LoginResponseDTO;
-import com.example.demo.dto.response.ProfileImageResponseDTO;
-import com.example.demo.dto.response.UserProfileResponseDTO;
-import com.example.demo.model.User;
+import com.example.backendspringboot.dto.request.ChangePasswordRequest;
+import com.example.backendspringboot.dto.request.LoginRequestDTO;
+import com.example.backendspringboot.dto.request.UpdateUserProfileRequestDTO;
+import com.example.backendspringboot.dto.request.UserRegistrationRequestDTO;
+import com.example.backendspringboot.dto.response.LoginResponseDTO;
+import com.example.backendspringboot.dto.response.ProfileImageResponseDTO;
+import com.example.backendspringboot.dto.response.UserProfileResponseDTO;
+import com.example.backendspringboot.model.User;
 import org.springframework.web.multipart.MultipartFile;
 
 public interface UserService {

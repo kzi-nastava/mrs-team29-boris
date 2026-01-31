@@ -1,6 +1,6 @@
-package com.example.demo.dto.response;
+package com.example.backendspringboot.dto.response;
 
-import com.example.demo.model.VehicleType;
+import com.example.backendspringboot.model.VehicleType;
 import jakarta.persistence.Column;
 import jakarta.persistence.EnumType;
 import jakarta.persistence.Enumerated;

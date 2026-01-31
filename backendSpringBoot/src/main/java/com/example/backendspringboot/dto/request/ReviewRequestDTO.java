@@ -1,4 +1,4 @@
-package com.example.demo.dto.request;
+package com.example.backendspringboot.dto.request;
 
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;

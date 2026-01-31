@@ -1,4 +1,4 @@
-package com.example.demo.services.interfaces;
+package com.example.backendspringboot.services.interfaces;
 
 public interface MessageService {
 }

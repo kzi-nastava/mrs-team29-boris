@@ -1,4 +1,4 @@
-package com.example.demo.dto.response;
+package com.example.backendspringboot.dto.response;
 
 import java.time.LocalDateTime;
 import lombok.AllArgsConstructor;

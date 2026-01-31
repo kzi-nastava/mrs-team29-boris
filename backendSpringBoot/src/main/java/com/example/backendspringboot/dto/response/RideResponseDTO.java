@@ -1,6 +1,6 @@
-package com.example.demo.dto.response;
+package com.example.backendspringboot.dto.response;
 
-import com.example.demo.model.RideStatus;
+import com.example.backendspringboot.model.RideStatus;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.Setter;

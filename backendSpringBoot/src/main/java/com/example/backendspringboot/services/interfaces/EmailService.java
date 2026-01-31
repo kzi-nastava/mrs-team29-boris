@@ -1,8 +1,8 @@
-package com.example.demo.services.interfaces;
+package com.example.backendspringboot.services.interfaces;
 
-import com.example.demo.model.Driver;
-import com.example.demo.model.EmailDetails;
-import com.example.demo.model.Passenger;
+import com.example.backendspringboot.model.Driver;
+import com.example.backendspringboot.model.EmailDetails;
+import com.example.backendspringboot.model.Passenger;
 
 public interface EmailService {
     // Method to send a simple mail

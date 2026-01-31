@@ -1,12 +1,12 @@
-package com.example.demo.services.interfaces;
+package com.example.backendspringboot.services.interfaces;
 
-import com.example.demo.dto.request.CompleteRegistrationRequestDTO;
-import com.example.demo.dto.request.DriverRegistrationRequestDTO;
-import com.example.demo.dto.response.DriverRegistrationResponseDTO;
-import com.example.demo.dto.response.UserProfileResponseDTO;
-import com.example.demo.dto.response.VehicleResponseDTO;
-import com.example.demo.dto.response.DriverRideHistoryResponseDTO;
-import com.example.demo.model.Driver;
+import com.example.backendspringboot.dto.request.CompleteRegistrationRequestDTO;
+import com.example.backendspringboot.dto.request.DriverRegistrationRequestDTO;
+import com.example.backendspringboot.dto.response.DriverRegistrationResponseDTO;
+import com.example.backendspringboot.dto.response.UserProfileResponseDTO;
+import com.example.backendspringboot.dto.response.VehicleResponseDTO;
+import com.example.backendspringboot.dto.response.DriverRideHistoryResponseDTO;
+import com.example.backendspringboot.model.Driver;
 
 import java.util.List;
 import java.util.Optional;

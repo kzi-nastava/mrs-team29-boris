@@ -1,8 +1,8 @@
-package com.example.demo.services.interfaces;
+package com.example.backendspringboot.services.interfaces;
 
-import com.example.demo.dto.request.RideRequestUnregisteredDTO;
-import com.example.demo.dto.response.GuestRideResponseDTO;
-import com.example.demo.model.GuestRide;
+import com.example.backendspringboot.dto.request.RideRequestUnregisteredDTO;
+import com.example.backendspringboot.dto.response.GuestRideResponseDTO;
+import com.example.backendspringboot.model.GuestRide;
 
 import java.util.List;
 

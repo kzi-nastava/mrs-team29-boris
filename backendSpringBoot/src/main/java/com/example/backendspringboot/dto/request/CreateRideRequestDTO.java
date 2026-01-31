@@ -1,7 +1,7 @@
-package com.example.demo.dto.request;
+package com.example.backendspringboot.dto.request;
 
-import com.example.demo.dto.LocationDTO;
-import com.example.demo.model.VehicleType;
+import com.example.backendspringboot.dto.LocationDTO;
+import com.example.backendspringboot.model.VehicleType;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.Future;

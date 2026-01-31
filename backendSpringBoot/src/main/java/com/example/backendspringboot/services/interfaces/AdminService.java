@@ -1,8 +1,8 @@
-package com.example.demo.services.interfaces;
+package com.example.backendspringboot.services.interfaces;
 
-import com.example.demo.dto.response.AdminRideHistoryResponseDTO;
-import com.example.demo.dto.response.AdminUserResponseDTO;
-import com.example.demo.dto.response.UserProfileResponseDTO;
+import com.example.backendspringboot.dto.response.AdminRideHistoryResponseDTO;
+import com.example.backendspringboot.dto.response.AdminUserResponseDTO;
+import com.example.backendspringboot.dto.response.UserProfileResponseDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;

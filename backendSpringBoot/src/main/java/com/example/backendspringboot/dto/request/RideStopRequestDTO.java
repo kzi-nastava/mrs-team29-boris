@@ -1,6 +1,6 @@
-package com.example.demo.dto.request;
+package com.example.backendspringboot.dto.request;
 
-import com.example.demo.dto.LocationDTO;
+import com.example.backendspringboot.dto.LocationDTO;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.NotNull;
 import lombok.Getter;

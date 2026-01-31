@@ -1,8 +1,8 @@
-package com.example.demo.services.interfaces;
+package com.example.backendspringboot.services.interfaces;
 
-import com.example.demo.dto.response.PassengerRideHistoryResponseDTO;
-import com.example.demo.dto.response.RouteFromFavoritesResponseDTO;
-import com.example.demo.dto.response.UserProfileResponseDTO;
+import com.example.backendspringboot.dto.response.PassengerRideHistoryResponseDTO;
+import com.example.backendspringboot.dto.response.RouteFromFavoritesResponseDTO;
+import com.example.backendspringboot.dto.response.UserProfileResponseDTO;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 

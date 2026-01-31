@@ -1,6 +1,6 @@
-package com.example.demo.dto.request;
+package com.example.backendspringboot.dto.request;
 
-import com.example.demo.model.Gender;
+import com.example.backendspringboot.model.Gender;
 import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;

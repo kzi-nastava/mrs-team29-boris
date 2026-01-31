@@ -1,6 +1,6 @@
-package com.example.demo.services.interfaces;
+package com.example.backendspringboot.services.interfaces;
 
-import com.example.demo.dto.request.ReviewRequestDTO;
+import com.example.backendspringboot.dto.request.ReviewRequestDTO;
 
 import java.util.List;
 

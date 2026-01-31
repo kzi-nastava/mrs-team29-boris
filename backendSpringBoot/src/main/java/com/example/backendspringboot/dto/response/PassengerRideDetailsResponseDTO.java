@@ -1,7 +1,7 @@
-package com.example.demo.dto.response;
+package com.example.backendspringboot.dto.response;
 
-import com.example.demo.dto.LocationDTO;
-import com.example.demo.model.Review;
+import com.example.backendspringboot.dto.LocationDTO;
+import com.example.backendspringboot.model.Review;
 import lombok.AllArgsConstructor;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
