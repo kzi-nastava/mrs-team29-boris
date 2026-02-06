@@ -1,4 +1,4 @@
-package com.example.demo.controller;
+package com.example.backendspringboot.controller;
 
 import com.example.backendspringboot.dto.response.RouteFromFavoritesResponseDTO;
 import com.example.backendspringboot.services.PassengerServiceImpl;
