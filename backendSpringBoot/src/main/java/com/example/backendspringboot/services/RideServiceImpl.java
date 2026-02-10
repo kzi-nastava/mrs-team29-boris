@@ -11,7 +11,6 @@ import com.example.backendspringboot.services.interfaces.RideService;
 
 import lombok.RequiredArgsConstructor;
 import org.apache.coyote.BadRequestException;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
 import org.springframework.data.domain.PageRequest;
@@ -44,12 +43,10 @@ public class RideServiceImpl implements RideService {
     //Service
     private final EmailService emailService;
     private final VehiclePriceRepository vehiclePriceRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     //Other
     private static final double TRACKING_SIMULATION_SPEED = 10.0;
-
-    @Autowired
-    private SimpMessagingTemplate messagingTemplate;
 
     // Ride creation
     @Override
