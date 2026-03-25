@@ -60,13 +60,36 @@ public class BackendSpringBootApplication {
 			}
 
 			// ------------------ 3. DRIVERS & VEHICLES ------------------
-			if (driverRepository.count() == 0) {
-				double[][] coords = {{45.2641, 19.8302}, {45.2426, 19.8820}, {45.2399, 19.8253}};
-				String[] addresses = {"Bulevar Kralja Petra I", "Futoški put", "Bulevar Evrope"};
-				String[] emails = {"driver@demo.com", "driver2@demo.com", "driver3@demo.com"};
-				String[] regs = {"NS-001-AA", "NS-002-BB", "NS-003-CC"};
+			double[][] coords = {
+					{45.2641, 19.8302},
+					{45.2426, 19.8820},
+					{45.2399, 19.8253},
+					{45.2517, 19.8369},
+					{45.2454, 19.8247}
+			};
+			String[] addresses = {
+					"Bulevar Kralja Petra I",
+					"Futoški put",
+					"Bulevar Evrope",
+					"Bulevar oslobođenja",
+					"Cara Dušana"
+			};
+			String[] names = {"Marko", "Ivan", "Petar", "Miloš", "Nikola"};
+			String[] emails = {
+					"driver@demo.com",
+					"driver2@demo.com",
+					"driver3@demo.com",
+					"driver4@demo.com",
+					"driver5@demo.com"
+			};
+			String[] regs = {"NS-001-AA", "NS-002-BB", "NS-003-CC", "NS-004-DD", "NS-005-EE"};
 
-				for (int i = 0; i < 3; i++) {
+			for (int i = 0; i < regs.length; i++) {
+				if (vehicleRepository.existsByRegistration(regs[i])
+						|| driverRepository.existsByEmail(emails[i])) {
+					continue;
+				}
+
 					Location loc = new Location();
 					loc.setLatitude(coords[i][0]);
 					loc.setLongitude(coords[i][1]);
@@ -77,14 +100,14 @@ public class BackendSpringBootApplication {
 					v.setRegistration(regs[i]);
 					v.setSeats(4);
 					v.setType(VehicleType.STANDARD);
-					v.setBusy(false);
+					v.setBusy(i >= 3);
 					v.setIsBabyFriendly(true);
 					v.setIsPetFriendly(true);
 					v.setLocation(loc);
 					v = vehicleRepository.save(v);
 
 					Driver d = new Driver();
-					d.setName(i == 0 ? "Marko" : (i == 1 ? "Ivan" : "Petar"));
+					d.setName(names[i]);
 					d.setSurname("Driverovic");
 					d.setEmail(emails[i]);
 					d.setPassword(passwordEncoder.encode("driver123"));
@@ -94,7 +117,6 @@ public class BackendSpringBootApplication {
 					d.setVehicle(v);
 					d.setAddress("Driver Street " + i);
 					driverRepository.save(d);
-				}
 			}
 
 			// ------------------ 4. ROUTES (6 RUTA) ------------------
