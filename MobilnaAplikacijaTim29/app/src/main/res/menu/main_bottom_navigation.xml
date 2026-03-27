@@ -9,7 +9,8 @@
         android:icon="@android:drawable/ic_lock_lock"
         android:title="Prijava" />
     <item
-        android:id="@+id/nav_register"
-        android:icon="@android:drawable/ic_input_add"
-        android:title="Registracija" />
+        android:id="@+id/nav_dashboard"
+        android:icon="@android:drawable/ic_menu_manage"
+        android:title="Nalog"
+        android:visible="false" />
 </menu>

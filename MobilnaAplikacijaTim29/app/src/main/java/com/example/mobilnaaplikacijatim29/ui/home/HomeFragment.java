@@ -93,14 +93,12 @@ public class HomeFragment extends Fragment {
         TextView sessionStatus = view.findViewById(R.id.session_status);
         vehiclesStatus = view.findViewById(R.id.vehicles_status);
         View loginButton = view.findViewById(R.id.login_button);
-        View registerButton = view.findViewById(R.id.register_button);
         View logoutButton = view.findViewById(R.id.logout_button);
 
         if (sessionManager.isLoggedIn()) {
             sessionStatus.setText("Prijavljen korisnik: " + sessionManager.getEmail()
                     + " (" + sessionManager.getRole() + ")");
             loginButton.setVisibility(View.GONE);
-            registerButton.setVisibility(View.GONE);
             logoutButton.setVisibility(View.VISIBLE);
         } else {
             sessionStatus.setText("Niste prijavljeni.");
@@ -108,12 +106,9 @@ public class HomeFragment extends Fragment {
 
         loginButton.setOnClickListener(v ->
                 ((MainActivity) requireActivity()).navigateTo(R.id.nav_login));
-        registerButton.setOnClickListener(v ->
-                ((MainActivity) requireActivity()).navigateTo(R.id.nav_register));
         logoutButton.setOnClickListener(v -> {
-            sessionManager.clear();
-            Toast.makeText(requireContext(), "Uspešno ste se odjavili.", Toast.LENGTH_SHORT).show();
-            ((MainActivity) requireActivity()).navigateTo(R.id.nav_home);
+            ((MainActivity) requireActivity()).requestLogout(message ->
+                    Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show());
         });
 
     }

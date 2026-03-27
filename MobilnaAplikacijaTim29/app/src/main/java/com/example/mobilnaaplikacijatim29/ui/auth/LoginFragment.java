@@ -44,6 +44,10 @@ public class LoginFragment extends Fragment {
         TextView errorView = view.findViewById(R.id.login_error);
         ProgressBar progress = view.findViewById(R.id.login_progress);
         View submit = view.findViewById(R.id.login_submit);
+        View forgotPassword = view.findViewById(R.id.login_forgot_password);
+
+        forgotPassword.setOnClickListener(v ->
+                ((MainActivity) requireActivity()).navigateTo(R.id.nav_forgot_password));
 
         submit.setOnClickListener(v -> {
             String email = textOf(emailInput);
@@ -80,7 +84,7 @@ public class LoginFragment extends Fragment {
 
                             new SessionManager(requireContext()).save(response.body());
                             Toast.makeText(requireContext(), "Uspešna prijava.", Toast.LENGTH_SHORT).show();
-                            ((MainActivity) requireActivity()).navigateTo(R.id.nav_home);
+                            ((MainActivity) requireActivity()).navigateAfterLogin();
                         }
 
                         @Override

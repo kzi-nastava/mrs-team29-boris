@@ -67,14 +67,6 @@
             android:text="Prijavi se" />
 
         <com.google.android.material.button.MaterialButton
-            android:id="@+id/register_button"
-            style="@style/Widget.Material3.Button.OutlinedButton"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Napravi nalog" />
-
-        <com.google.android.material.button.MaterialButton
             android:id="@+id/logout_button"
             style="@style/Widget.Material3.Button.TextButton"
             android:layout_width="match_parent"

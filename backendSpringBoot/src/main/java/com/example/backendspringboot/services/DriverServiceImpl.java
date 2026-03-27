@@ -26,6 +26,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.time.LocalDateTime;
 import java.util.stream.Collectors;
 
 @Service
@@ -140,6 +141,10 @@ public class DriverServiceImpl implements DriverService {
         if (driverRepository.existsByEmail(request.getEmail())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email already exists");
         }
+        if (vehicleRepository.existsByRegistration(request.getVehicle().getRegistration())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Vehicle registration already exists");
+        }
 
         // Create Vehicle object
         Vehicle vehicle = new Vehicle();
@@ -165,6 +170,7 @@ public class DriverServiceImpl implements DriverService {
         driver.setVehicle(vehicle); // set vehicle
         // Random token to keep track which driver is being registered
         driver.setRegistrationToken(UUID.randomUUID().toString());
+        driver.setRegistrationTokenExpiry(LocalDateTime.now().plusHours(24));
 
         // Write in database
         Driver saved = driverRepository.save(driver);
@@ -172,8 +178,8 @@ public class DriverServiceImpl implements DriverService {
         // Determine registration link based on platform
         String registrationLink;
         if (platform.equalsIgnoreCase("mobile")) {
-            // Deep link android app
-            registrationLink = "https://www.clickanddrive.com/complete-registration?token=" + driver.getRegistrationToken();
+            registrationLink = "clickanddrive://complete-registration?token="
+                    + driver.getRegistrationToken();
         } else {
             // Web app by default
             registrationLink = "http://localhost:4200/complete-registration?token=" + driver.getRegistrationToken();
@@ -208,6 +214,11 @@ public class DriverServiceImpl implements DriverService {
         try {
             Driver driver = driverRepository.findByRegistrationToken(request.getToken()).orElseThrow(() -> new BadRequestException("Invalid or expired token"));
 
+            if (driver.getRegistrationTokenExpiry() == null
+                    || driver.getRegistrationTokenExpiry().isBefore(LocalDateTime.now())) {
+                throw new BadRequestException("Invalid or expired token");
+            }
+
             // Validation
             // Check if password is already set
             if (driver.getRegistrationToken() == null) {
@@ -219,6 +230,7 @@ public class DriverServiceImpl implements DriverService {
 
             // Delete registration token
             driver.setRegistrationToken(null);
+            driver.setRegistrationTokenExpiry(null);
 
             driver.setStatus(DriverStatus.ACTIVE);
             driver.setWorkMinutes(0);

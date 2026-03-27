@@ -4,6 +4,7 @@ import com.example.backendspringboot.dto.request.*;
 import com.example.backendspringboot.dto.response.LoginResponseDTO;
 import com.example.backendspringboot.dto.response.ProfileImageResponseDTO;
 import com.example.backendspringboot.dto.response.UserProfileResponseDTO;
+import com.example.backendspringboot.dto.response.DriverStatusResponseDTO;
 import com.example.backendspringboot.model.Administrator;
 import com.example.backendspringboot.model.Gender;
 import com.example.backendspringboot.model.Passenger;
@@ -20,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import com.example.backendspringboot.services.interfaces.UserService;
 import org.springframework.web.multipart.MultipartFile;
@@ -157,29 +159,45 @@ public class UserController {
 
     // POST: Logout korisnika
     @PostMapping("/auth/logout")
-    public ResponseEntity<Void> logout() {
+    public ResponseEntity<Void> logout(Authentication authentication) {
+        if (authentication == null) {
+            return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
+        }
+        userService.logout(authentication.getName());
         return ResponseEntity.noContent().build();
     }
 
     // POST: Zaboravljena lozinka
     @PostMapping("/auth/forgot-password")
-    public ResponseEntity<Void> forgotPassword(@RequestBody ForgotPasswordRequestDTO request) {
+    public ResponseEntity<Void> forgotPassword(@Valid @RequestBody ForgotPasswordRequestDTO request) {
+        userService.requestPasswordReset(request.getEmail());
         return ResponseEntity.ok().build();
     }
 
     // POST: Reset lozinke
     @PostMapping("/auth/reset-password")
-    public ResponseEntity<Void> resetPassword(@RequestBody ResetPasswordRequestDTO request) {
+    public ResponseEntity<Void> resetPassword(@Valid @RequestBody ResetPasswordRequestDTO request) {
+        userService.resetPassword(request);
         return ResponseEntity.ok().build();
     }
 
     // PATCH: Promena statusa vozača
     @PatchMapping("/drivers/{id}/status")
-    public ResponseEntity<Void> changeDriverStatus(
+    public ResponseEntity<DriverStatusResponseDTO> changeDriverStatus(
             @PathVariable Long id,
-            @RequestBody DriverStatusRequestDTO request
+            @RequestBody DriverStatusRequestDTO request,
+            Authentication authentication
     ) {
-        return ResponseEntity.ok().build();
+        return ResponseEntity.ok(userService.changeDriverStatus(
+                id, request, authentication.getName()));
+    }
+
+    @GetMapping("/drivers/{id}/status")
+    public ResponseEntity<DriverStatusResponseDTO> getDriverStatus(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(userService.getDriverStatus(id, authentication.getName()));
     }
 
     // POST: Registracija korisnika

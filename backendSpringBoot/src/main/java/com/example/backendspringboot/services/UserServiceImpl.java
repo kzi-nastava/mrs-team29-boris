@@ -1,7 +1,9 @@
 package com.example.backendspringboot.services;
 
 import com.example.backendspringboot.dto.request.ChangePasswordRequest;
+import com.example.backendspringboot.dto.request.DriverStatusRequestDTO;
 import com.example.backendspringboot.dto.request.LoginRequestDTO;
+import com.example.backendspringboot.dto.request.ResetPasswordRequestDTO;
 import com.example.backendspringboot.dto.request.UpdateUserProfileRequestDTO;
 import com.example.backendspringboot.dto.response.*;
 import com.example.backendspringboot.model.*;
@@ -33,6 +35,7 @@ import java.nio.file.StandardCopyOption;
 import java.time.LocalDateTime;
 import java.util.Map;
 import java.util.Optional;
+import java.util.UUID;
 
 @Service
 public class UserServiceImpl implements UserService {
@@ -85,6 +88,16 @@ public class UserServiceImpl implements UserService {
             throw new RuntimeException("Wrong password");
         }
 
+        if (user instanceof Driver driver) {
+            if (driver.getStatus() == DriverStatus.PENDING) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "Driver registration is not completed");
+            }
+            driver.setStatus(DriverStatus.ACTIVE);
+            driver.setDeactivateAfterRide(false);
+            userRepository.save(driver);
+        }
+
         String role = user.getClass().getSimpleName().toLowerCase();
         if (role.equals("administrator")) {
             role = "admin";
@@ -97,6 +110,114 @@ public class UserServiceImpl implements UserService {
         String token = jwtUtil.generateToken(user);
 
         return new LoginResponseDTO(user.getId(), user.getEmail(), role, token, user.isBlocked(), user.getBlockReason());
+    }
+
+    @Override
+    @Transactional
+    public void logout(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        if (user instanceof Driver driver) {
+            if (driver.getActiveRide() != null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT,
+                        "Driver cannot log out during an active ride");
+            }
+            driver.setStatus(DriverStatus.INACTIVE);
+            driver.setDeactivateAfterRide(false);
+            userRepository.save(driver);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void requestPasswordReset(String email) {
+        userRepository.findByEmail(email).ifPresent(user -> {
+            String token = UUID.randomUUID().toString();
+            user.setPasswordResetToken(token);
+            user.setPasswordResetTokenExpiry(LocalDateTime.now().plusHours(1));
+            userRepository.save(user);
+
+            EmailDetails details = new EmailDetails();
+            details.setRecipient(user.getEmail());
+            details.setSubject("Reset your ClickAndDrive password");
+            details.setMsgBody(
+                    "Open this link to set a new password:\n\n"
+                            + "clickanddrive://reset-password?token=" + token
+                            + "\n\nThe link expires in one hour."
+            );
+            emailService.sendsSimpleMail(details);
+        });
+    }
+
+    @Override
+    @Transactional
+    public void resetPassword(ResetPasswordRequestDTO request) {
+        if (!request.getNewPassword().equals(request.getConfirmPassword())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Passwords do not match");
+        }
+        User user = userRepository.findByPasswordResetToken(request.getToken())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Invalid password reset token"));
+        if (user.getPasswordResetTokenExpiry() == null
+                || user.getPasswordResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Password reset token has expired");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setPasswordResetToken(null);
+        user.setPasswordResetTokenExpiry(null);
+        userRepository.save(user);
+    }
+
+    @Override
+    public DriverStatusResponseDTO getDriverStatus(Long id, String requesterEmail) {
+        Driver driver = getAuthorizedDriver(id, requesterEmail);
+        return toDriverStatusResponse(driver);
+    }
+
+    @Override
+    @Transactional
+    public DriverStatusResponseDTO changeDriverStatus(Long id, DriverStatusRequestDTO request,
+                                                       String requesterEmail) {
+        Driver driver = getAuthorizedDriver(id, requesterEmail);
+        if (request.getStatus() == null || request.getStatus() == DriverStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid driver status");
+        }
+
+        if (request.getStatus() == DriverStatus.ACTIVE) {
+            driver.setStatus(DriverStatus.ACTIVE);
+            driver.setDeactivateAfterRide(false);
+        } else if (driver.getActiveRide() != null) {
+            driver.setDeactivateAfterRide(true);
+        } else {
+            driver.setStatus(DriverStatus.INACTIVE);
+            driver.setDeactivateAfterRide(false);
+        }
+        userRepository.save(driver);
+        return toDriverStatusResponse(driver);
+    }
+
+    private Driver getAuthorizedDriver(Long id, String requesterEmail) {
+        User requester = userRepository.findByEmail(requesterEmail)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED));
+        Driver driver = userRepository.findById(id)
+                .filter(Driver.class::isInstance)
+                .map(Driver.class::cast)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Driver not found"));
+        if (!(requester instanceof Administrator) && !requester.getId().equals(driver.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        return driver;
+    }
+
+    private DriverStatusResponseDTO toDriverStatusResponse(Driver driver) {
+        return new DriverStatusResponseDTO(
+                driver.getStatus(),
+                driver.isDeactivateAfterRide(),
+                driver.getActiveRide() != null
+        );
     }
 
     public UserProfileResponseDTO getUserProfile(Long id) {

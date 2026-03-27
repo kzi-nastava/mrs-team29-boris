@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="nav_driver_registration" type="id" />
+    <item name="nav_forgot_password" type="id" />
+    <item name="nav_reset_password" type="id" />
+    <item name="nav_complete_driver_registration" type="id" />
+</resources>

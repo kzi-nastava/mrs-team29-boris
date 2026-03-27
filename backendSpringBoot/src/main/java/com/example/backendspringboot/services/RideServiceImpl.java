@@ -514,6 +514,7 @@ public class RideServiceImpl implements RideService {
         //update driver active ride
         Driver driver =  ride.getDriver();
         driver.setActiveRide(null);
+        applyPendingDriverDeactivation(driver);
         driverRepository.save(driver);
 
         //update vehicle
@@ -549,6 +550,7 @@ public class RideServiceImpl implements RideService {
         //update driver active ride
         Driver driver =  guestRide.getDriver();
         driver.setActiveRide(null);
+        applyPendingDriverDeactivation(driver);
         driverRepository.save(driver);
 
         //update vehicle
@@ -618,6 +620,7 @@ public class RideServiceImpl implements RideService {
         //GuestRide specific logic, no emails
         Vehicle vehicle = driver.getVehicle();
         driver.setActiveRide(null);
+        applyPendingDriverDeactivation(driver);
         vehicle.setBusy(false);
         vehicle.setLocation(guestRide.getRoute().getDestination());
 
@@ -634,6 +637,7 @@ public class RideServiceImpl implements RideService {
     private void updateDriverAndVehicleAfterRide(Driver driver, double distance, Route route,
                                                  java.util.function.BiConsumer<Double, VehicleType> extraLogic) {
         driver.setActiveRide(null);
+        applyPendingDriverDeactivation(driver);
         driverRepository.save(driver);
 
         Vehicle vehicle = driver.getVehicle();
@@ -642,6 +646,13 @@ public class RideServiceImpl implements RideService {
         vehicleRepository.save(vehicle);
 
         extraLogic.accept(distance, vehicle.getType());
+    }
+
+    private void applyPendingDriverDeactivation(Driver driver) {
+        if (driver.isDeactivateAfterRide()) {
+            driver.setStatus(DriverStatus.INACTIVE);
+            driver.setDeactivateAfterRide(false);
+        }
     }
 
     private double calculateRidePrice(double distance, VehicleType vehicleType) {

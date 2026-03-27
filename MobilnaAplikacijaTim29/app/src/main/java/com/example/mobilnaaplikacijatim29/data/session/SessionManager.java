@@ -36,6 +36,14 @@ public class SessionManager {
         return preferences.getString(KEY_EMAIL, "");
     }
 
+    public long getUserId() {
+        return preferences.getLong(KEY_USER_ID, -1L);
+    }
+
+    public String getAuthorizationHeader() {
+        return "Bearer " + getToken();
+    }
+
     public String getRole() {
         return preferences.getString(KEY_ROLE, "");
     }

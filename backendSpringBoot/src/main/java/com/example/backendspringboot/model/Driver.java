@@ -7,6 +7,7 @@ import org.hibernate.annotations.Where;
 import org.springframework.core.annotation.Order;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Getter
 @Setter
@@ -41,4 +42,10 @@ public class Driver extends User {
     // Will be changed when others finish authorization
     @Column(name = "registration_token")
     private String registrationToken;
+
+    @Column(name = "registration_token_expiry")
+    private LocalDateTime registrationTokenExpiry;
+
+    @Column(name = "deactivate_after_ride", nullable = false)
+    private boolean deactivateAfterRide = false;
 }
