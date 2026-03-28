@@ -3,8 +3,6 @@ package com.example.mobilnaaplikacijatim29.data.api;
 import com.example.mobilnaaplikacijatim29.data.model.ActiveVehicleResponse;
 import com.example.mobilnaaplikacijatim29.data.model.LoginRequest;
 import com.example.mobilnaaplikacijatim29.data.model.LoginResponse;
-import com.example.mobilnaaplikacijatim29.data.model.RegisterRequest;
-import com.example.mobilnaaplikacijatim29.data.model.UserProfileResponse;
 import com.example.mobilnaaplikacijatim29.data.model.ForgotPasswordRequest;
 import com.example.mobilnaaplikacijatim29.data.model.ResetPasswordRequest;
 import com.example.mobilnaaplikacijatim29.data.model.DriverStatusRequest;
@@ -31,9 +29,6 @@ public interface BackendApi {
 
     @POST("api/user/auth/login")
     Call<LoginResponse> login(@Body LoginRequest request);
-
-    @POST("api/user/auth/register")
-    Call<UserProfileResponse> register(@Body RegisterRequest request);
 
     @POST("api/user/auth/forgot-password")
     Call<Void> forgotPassword(@Body ForgotPasswordRequest request);

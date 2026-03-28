@@ -84,15 +84,16 @@ public class UserServiceImpl implements UserService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account not activated. Check your email.");
         }
 
+        if (user instanceof Driver driver && driver.getStatus() == DriverStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Driver registration is not completed");
+        }
+
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
             throw new RuntimeException("Wrong password");
         }
 
         if (user instanceof Driver driver) {
-            if (driver.getStatus() == DriverStatus.PENDING) {
-                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
-                        "Driver registration is not completed");
-            }
             driver.setStatus(DriverStatus.ACTIVE);
             driver.setDeactivateAfterRide(false);
             userRepository.save(driver);
