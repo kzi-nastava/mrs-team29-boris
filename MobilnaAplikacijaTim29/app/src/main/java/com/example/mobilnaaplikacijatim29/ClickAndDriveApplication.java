@@ -6,6 +6,8 @@ import android.content.SharedPreferences;
 import org.osmdroid.config.Configuration;
 import org.osmdroid.config.IConfigurationProvider;
 
+import com.example.mobilnaaplikacijatim29.data.session.SessionManager;
+
 import java.io.File;
 
 public class ClickAndDriveApplication extends Application {
@@ -16,6 +18,9 @@ public class ClickAndDriveApplication extends Application {
     @Override
     public void onCreate() {
         super.onCreate();
+
+        // Development behavior: every new Android process starts logged out.
+        new SessionManager(this).clear();
 
         SharedPreferences preferences = getSharedPreferences(
                 "osmdroid_configuration",

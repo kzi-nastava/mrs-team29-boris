@@ -22,6 +22,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -50,7 +51,16 @@ public class AdminController {
             @RequestParam(defaultValue = "web") String platform) {
 
         // Call service function to register a new driver into the app
-        DriverRegistrationResponseDTO response = driverService.registerDriver(request, platform);
+        String mobileRegistrationBaseUrl = ServletUriComponentsBuilder
+                .fromCurrentContextPath()
+                .path("/api/drivers/open-registration")
+                .build()
+                .toUriString();
+        DriverRegistrationResponseDTO response = driverService.registerDriver(
+                request,
+                platform,
+                mobileRegistrationBaseUrl
+        );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }

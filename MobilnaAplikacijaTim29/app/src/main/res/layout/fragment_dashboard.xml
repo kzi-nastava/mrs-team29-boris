@@ -52,7 +52,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="16dp"
-                android:text="Postani aktivan" />
+                android:text="Postani aktivan"
+                android:visibility="gone" />
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/driver_set_inactive"
@@ -60,7 +61,8 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
-                android:text="Postani neaktivan" />
+                android:text="Postani neaktivan"
+                android:visibility="gone" />
         </LinearLayout>
 
         <TextView

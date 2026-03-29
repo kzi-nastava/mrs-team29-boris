@@ -50,6 +50,7 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/user/auth/**",
                                 "/api/drivers/complete-registration",
+                                "/api/drivers/open-registration",
                                 "/api/guest-rides/**",
                                 "/api/rides/**",
                                 "/api/vehicles/active",                     //map view

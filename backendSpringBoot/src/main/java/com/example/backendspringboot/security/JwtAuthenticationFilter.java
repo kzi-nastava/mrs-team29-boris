@@ -35,7 +35,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         String path = request.getRequestURI();
 
         // preskoči filter za otvorene endpoint-e
-        if (path.startsWith("/auth/") || path.equals("/api/drivers/complete-registration")) {
+        if (path.startsWith("/auth/")
+                || path.equals("/api/drivers/complete-registration")
+                || path.equals("/api/drivers/open-registration")) {
             filterChain.doFilter(request, response);
             return;
         }

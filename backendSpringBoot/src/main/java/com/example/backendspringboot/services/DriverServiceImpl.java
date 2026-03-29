@@ -28,6 +28,7 @@ import java.util.List;
 import java.util.UUID;
 import java.time.LocalDateTime;
 import java.util.stream.Collectors;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @Service
 @RequiredArgsConstructor
@@ -135,7 +136,10 @@ public class DriverServiceImpl implements DriverService {
     }
 
     @Override
-    public DriverRegistrationResponseDTO registerDriver(DriverRegistrationRequestDTO request, String platform) {
+    public DriverRegistrationResponseDTO registerDriver(
+            DriverRegistrationRequestDTO request,
+            String platform,
+            String mobileRegistrationBaseUrl) {
 
         // Validation
         if (driverRepository.existsByEmail(request.getEmail())) {
@@ -178,8 +182,13 @@ public class DriverServiceImpl implements DriverService {
         // Determine registration link based on platform
         String registrationLink;
         if (platform.equalsIgnoreCase("mobile")) {
-            registrationLink = "clickanddrive://complete-registration?token="
-                    + driver.getRegistrationToken();
+            // Email clients commonly remove custom schemes such as clickanddrive://.
+            // Use a regular HTTP link and let the backend redirect it to the app.
+            registrationLink = UriComponentsBuilder.fromUriString(mobileRegistrationBaseUrl)
+                    .queryParam("token", driver.getRegistrationToken())
+                    .build()
+                    .encode()
+                    .toUriString();
         } else {
             // Web app by default
             registrationLink = "http://localhost:4200/complete-registration?token=" + driver.getRegistrationToken();

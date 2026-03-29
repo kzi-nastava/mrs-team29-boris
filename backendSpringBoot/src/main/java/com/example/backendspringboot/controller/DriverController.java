@@ -15,6 +15,8 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.net.URI;
+import org.springframework.web.util.UriComponentsBuilder;
 
 @RestController
 @RequestMapping("/api/drivers")
@@ -41,6 +43,21 @@ public class DriverController {
 
         driverService.completeRegistration(request);
         return ResponseEntity.ok(Collections.singletonMap("message", "Completed registration"));
+    }
+
+    @GetMapping("/open-registration")
+    public ResponseEntity<Void> openRegistrationInMobileApp(@RequestParam String token) {
+        if (!driverService.isTokenValid(token)) {
+            return ResponseEntity.notFound().build();
+        }
+
+        URI appUri = UriComponentsBuilder
+                .fromUriString("clickanddrive://complete-registration")
+                .queryParam("token", token)
+                .build()
+                .encode()
+                .toUri();
+        return ResponseEntity.status(HttpStatus.FOUND).location(appUri).build();
     }
 
     @GetMapping("/{id}/vehicle")

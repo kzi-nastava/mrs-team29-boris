@@ -12,7 +12,11 @@ import java.util.List;
 import java.util.Optional;
 
 public interface DriverService {
-    DriverRegistrationResponseDTO registerDriver(DriverRegistrationRequestDTO request, String platform);
+    DriverRegistrationResponseDTO registerDriver(
+            DriverRegistrationRequestDTO request,
+            String platform,
+            String mobileRegistrationBaseUrl
+    );
     void completeRegistration(CompleteRegistrationRequestDTO request);
     boolean isTokenValid(String token);
     VehicleResponseDTO getDriverVehicle(Long id);

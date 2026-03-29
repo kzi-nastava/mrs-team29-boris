@@ -25,6 +25,8 @@ public class DriverDashboardFragment extends Fragment {
     private SessionManager session;
     private TextView statusView;
     private TextView messageView;
+    private View setActiveButton;
+    private View setInactiveButton;
 
     @Nullable
     @Override
@@ -38,12 +40,14 @@ public class DriverDashboardFragment extends Fragment {
         session = new SessionManager(requireContext());
         statusView = view.findViewById(R.id.driver_status_text);
         messageView = view.findViewById(R.id.dashboard_message);
+        setActiveButton = view.findViewById(R.id.driver_set_active);
+        setInactiveButton = view.findViewById(R.id.driver_set_inactive);
         ((TextView) view.findViewById(R.id.dashboard_title)).setText("Panel vozača");
         ((TextView) view.findViewById(R.id.dashboard_subtitle))
                 .setText("Prijavljeni ste kao " + session.getEmail());
         view.findViewById(R.id.driver_status_controls).setVisibility(View.VISIBLE);
-        view.findViewById(R.id.driver_set_active).setOnClickListener(v -> changeStatus("ACTIVE"));
-        view.findViewById(R.id.driver_set_inactive).setOnClickListener(v -> changeStatus("INACTIVE"));
+        setActiveButton.setOnClickListener(v -> changeStatus("ACTIVE"));
+        setInactiveButton.setOnClickListener(v -> changeStatus("INACTIVE"));
         view.findViewById(R.id.dashboard_logout).setOnClickListener(v ->
                 ((MainActivity) requireActivity()).requestLogout(this::showError));
         loadStatus();
@@ -78,6 +82,9 @@ public class DriverDashboardFragment extends Fragment {
                     statusView.setText("Status: " + ("ACTIVE".equals(status.getStatus())
                             ? "aktivan" : "neaktivan"));
                 }
+                boolean isActive = "ACTIVE".equals(status.getStatus());
+                setActiveButton.setVisibility(isActive ? View.GONE : View.VISIBLE);
+                setInactiveButton.setVisibility(isActive ? View.VISIBLE : View.GONE);
                 messageView.setVisibility(View.GONE);
             }
 

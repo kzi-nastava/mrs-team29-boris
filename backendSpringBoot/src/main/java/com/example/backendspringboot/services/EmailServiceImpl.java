@@ -102,7 +102,9 @@ public class EmailServiceImpl implements EmailService {
             helper.setText(
                     "<p>Hello " + driver.getName() + ",</p>" +
                             "<p>Welcome to ClickAndDrive! Please complete your registration by setting your password:</p>" +
-                            "<a href=\"" + registrationLink + "\">Complete Registration</a>" +
+                            "<p><a href=\"" + registrationLink + "\">Complete Registration</a></p>" +
+                            "<p>If the button does not work, open this address:<br/>" +
+                            "<a href=\"" + registrationLink + "\">" + registrationLink + "</a></p>" +
                             "<p>This link will expire in 24 hours.</p>" +
                             "<p>Best regards,<br/>ClickAndDrive Team</p>",
                     true

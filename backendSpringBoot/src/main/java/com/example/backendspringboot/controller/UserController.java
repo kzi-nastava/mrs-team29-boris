@@ -163,7 +163,7 @@ public class UserController {
         if (authentication == null) {
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).build();
         }
-        userService.logout(authentication.getName());
+        userService.logout(authenticatedEmail(authentication));
         return ResponseEntity.noContent().build();
     }
 
@@ -189,7 +189,7 @@ public class UserController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(userService.changeDriverStatus(
-                id, request, authentication.getName()));
+                id, request, authenticatedEmail(authentication)));
     }
 
     @GetMapping("/drivers/{id}/status")
@@ -197,7 +197,16 @@ public class UserController {
             @PathVariable Long id,
             Authentication authentication
     ) {
-        return ResponseEntity.ok(userService.getDriverStatus(id, authentication.getName()));
+        return ResponseEntity.ok(userService.getDriverStatus(
+                id, authenticatedEmail(authentication)));
+    }
+
+    static String authenticatedEmail(Authentication authentication) {
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof User user) {
+            return user.getEmail();
+        }
+        return authentication.getName();
     }
 
     // POST: Registracija korisnika
