@@ -4,4 +4,5 @@
     <item name="nav_forgot_password" type="id" />
     <item name="nav_reset_password" type="id" />
     <item name="nav_complete_driver_registration" type="id" />
+    <item name="nav_profile_change_requests" type="id" />
 </resources>

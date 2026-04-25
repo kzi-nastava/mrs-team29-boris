@@ -21,6 +21,17 @@ import retrofit2.http.PATCH;
 import retrofit2.http.Path;
 import retrofit2.http.POST;
 import retrofit2.http.Query;
+import retrofit2.http.PUT;
+import retrofit2.http.DELETE;
+import retrofit2.http.Multipart;
+import retrofit2.http.Part;
+import retrofit2.http.Url;
+import okhttp3.MultipartBody;
+import okhttp3.ResponseBody;
+import com.example.mobilnaaplikacijatim29.data.model.ProfileResponse;
+import com.example.mobilnaaplikacijatim29.data.model.ProfileUpdateRequest;
+import com.example.mobilnaaplikacijatim29.data.model.PasswordChangeRequest;
+import com.example.mobilnaaplikacijatim29.data.model.DriverProfileChangeResponse;
 
 public interface BackendApi {
 
@@ -61,4 +72,41 @@ public interface BackendApi {
 
     @POST("api/drivers/complete-registration")
     Call<Void> completeDriverRegistration(@Body CompleteRegistrationRequest request);
+
+    @GET("api/profile/me")
+    Call<ProfileResponse> getOwnProfile(@Header("Authorization") String authorization);
+
+    @PUT("api/profile/me")
+    Call<ProfileResponse> updateOwnProfile(
+            @Header("Authorization") String authorization,
+            @Body ProfileUpdateRequest request);
+
+    @Multipart
+    @POST("api/profile/me/image")
+    Call<ProfileResponse> uploadProfileImage(
+            @Header("Authorization") String authorization,
+            @Part MultipartBody.Part file);
+
+    @DELETE("api/profile/me/image")
+    Call<ProfileResponse> deleteProfileImage(@Header("Authorization") String authorization);
+
+    @POST("api/profile/me/password")
+    Call<Void> changeProfilePassword(
+            @Header("Authorization") String authorization,
+            @Body PasswordChangeRequest request);
+
+    @GET("api/profile/driver-change-requests")
+    Call<List<DriverProfileChangeResponse>> getDriverProfileChangeRequests(
+            @Header("Authorization") String authorization);
+
+    @POST("api/profile/driver-change-requests/{id}/approve")
+    Call<Void> approveDriverProfileChange(
+            @Header("Authorization") String authorization, @Path("id") long requestId);
+
+    @POST("api/profile/driver-change-requests/{id}/reject")
+    Call<Void> rejectDriverProfileChange(
+            @Header("Authorization") String authorization, @Path("id") long requestId);
+
+    @GET
+    Call<ResponseBody> downloadFile(@Url String url);
 }

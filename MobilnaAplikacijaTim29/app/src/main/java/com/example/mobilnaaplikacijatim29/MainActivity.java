@@ -24,6 +24,8 @@ import com.example.mobilnaaplikacijatim29.ui.auth.ResetPasswordFragment;
 import com.example.mobilnaaplikacijatim29.ui.driver.DriverDashboardFragment;
 import com.example.mobilnaaplikacijatim29.ui.home.HomeFragment;
 import com.example.mobilnaaplikacijatim29.ui.passenger.PassengerDashboardFragment;
+import com.example.mobilnaaplikacijatim29.ui.profile.ProfileFragment;
+import com.example.mobilnaaplikacijatim29.ui.admin.ProfileChangeRequestsFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import retrofit2.Call;
@@ -127,6 +129,7 @@ public class MainActivity extends AppCompatActivity {
         boolean loggedIn = sessionManager.isLoggedIn();
         bottomNavigation.getMenu().findItem(R.id.nav_login).setVisible(!loggedIn);
         bottomNavigation.getMenu().findItem(R.id.nav_dashboard).setVisible(loggedIn);
+        bottomNavigation.getMenu().findItem(R.id.nav_profile).setVisible(loggedIn);
         if (loggedIn) {
             String role = sessionManager.getRole();
             String title = "user".equalsIgnoreCase(role) ? "Putnik"
@@ -150,6 +153,10 @@ public class MainActivity extends AppCompatActivity {
             }
         } else if (destinationId == R.id.nav_driver_registration) {
             fragment = new DriverRegistrationFragment();
+        } else if (destinationId == R.id.nav_profile) {
+            fragment = new ProfileFragment();
+        } else if (destinationId == R.id.nav_profile_change_requests) {
+            fragment = new ProfileChangeRequestsFragment();
         } else if (destinationId == R.id.nav_forgot_password) {
             fragment = new ForgotPasswordFragment();
         } else if (destinationId == R.id.nav_reset_password) {

@@ -32,6 +32,10 @@ public class AdminDashboardFragment extends Fragment {
         registerDriver.setVisibility(View.VISIBLE);
         registerDriver.setOnClickListener(v ->
                 ((MainActivity) requireActivity()).navigateTo(R.id.nav_driver_registration));
+        View profileRequests = view.findViewById(R.id.admin_profile_change_requests);
+        profileRequests.setVisibility(View.VISIBLE);
+        profileRequests.setOnClickListener(v ->
+                ((MainActivity) requireActivity()).navigateTo(R.id.nav_profile_change_requests));
         view.findViewById(R.id.dashboard_logout).setOnClickListener(v ->
                 ((MainActivity) requireActivity()).requestLogout(message -> showMessage(view, message)));
     }
