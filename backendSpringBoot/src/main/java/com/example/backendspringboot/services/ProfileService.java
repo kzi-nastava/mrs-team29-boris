@@ -31,7 +31,11 @@ public class ProfileService {
     private final DriverProfileChangeRequestRepository changeRequestRepository;
     private final PasswordEncoder passwordEncoder;
 
-    private final Path imageDirectory = Paths.get("uploads/profile-images");
+    private Path imageDirectory = Paths.get("uploads/profile-images");
+
+    void useImageDirectory(Path imageDirectory) {
+        this.imageDirectory = imageDirectory;
+    }
 
     @PostConstruct
     void initializeStorage() throws IOException {

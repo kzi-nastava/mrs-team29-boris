@@ -46,6 +46,9 @@ public class DriverDashboardFragment extends Fragment {
         ((TextView) view.findViewById(R.id.dashboard_subtitle))
                 .setText("Prijavljeni ste kao " + session.getEmail());
         view.findViewById(R.id.driver_status_controls).setVisibility(View.VISIBLE);
+        view.findViewById(R.id.driver_ride_history).setVisibility(View.VISIBLE);
+        view.findViewById(R.id.driver_ride_history).setOnClickListener(v ->
+                ((MainActivity) requireActivity()).navigateTo(R.id.nav_driver_ride_history));
         setActiveButton.setOnClickListener(v -> changeStatus("ACTIVE"));
         setInactiveButton.setOnClickListener(v -> changeStatus("INACTIVE"));
         view.findViewById(R.id.dashboard_logout).setOnClickListener(v ->

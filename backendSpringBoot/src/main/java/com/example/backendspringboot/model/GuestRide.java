@@ -31,6 +31,13 @@ public class GuestRide {
 
     private LocalDateTime scheduledTime;
 
+    private LocalDateTime createdAt;
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) createdAt = LocalDateTime.now();
+    }
+
     private LocalDateTime startTime;
 
     private LocalDateTime endTime;

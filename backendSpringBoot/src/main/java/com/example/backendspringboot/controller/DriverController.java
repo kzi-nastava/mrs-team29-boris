@@ -17,6 +17,7 @@ import java.util.List;
 import java.util.Map;
 import java.net.URI;
 import org.springframework.web.util.UriComponentsBuilder;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/drivers")
@@ -29,13 +30,27 @@ public class DriverController {
 
     // 2.9.2: Driver history
     @GetMapping("/{id}/ride-history")
-    public ResponseEntity<?> getDriverHistory(@PathVariable Long id) {
+    public ResponseEntity<?> getDriverHistory(
+            @PathVariable Long id,
+            @RequestParam(required = false) LocalDate from,
+            @RequestParam(required = false) LocalDate to) {
         // get logged in Email
         if (!driverService.isOwnerOrAdmin(id)) {
             return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Cannot see others driver histories!");
         }
 
-        return ResponseEntity.ok(driverService.getDriverRideHistory(id));
+        return ResponseEntity.ok(driverService.getDriverRideHistory(id, from, to));
+    }
+
+    @GetMapping("/{id}/ride-history/{rideId}")
+    public ResponseEntity<DriverRideHistoryResponseDTO> getDriverHistoryDetail(
+            @PathVariable Long id,
+            @PathVariable Long rideId,
+            @RequestParam(defaultValue = "false") boolean guest) {
+        if (!driverService.isOwnerOrAdmin(id)) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        }
+        return ResponseEntity.ok(driverService.getDriverRideHistoryDetail(id, rideId, guest));
     }
 
     @PostMapping("/complete-registration")

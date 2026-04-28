@@ -214,7 +214,13 @@ public class BackendSpringBootApplication {
 					ride.setPrice(finalPrice);
 					ride.setStartTime(LocalDateTime.now().minusDays(i+1).plusHours(i));
 					ride.setEndTime(LocalDateTime.now().minusDays(i+1).plusHours(i).plusMinutes(20));
-					ride.setStatus(RideStatus.FINISHED);
+					if (i % 3 == 2) {
+						ride.setStatus(RideStatus.CANCELED);
+						ride.setCancelledBy(p);
+						ride.setCancellationReason("Putnik je otkazao demo vožnju");
+					} else {
+						ride.setStatus(RideStatus.FINISHED);
+					}
 					if (i == 1) ride.setPanicPressed(true);
 
 					rideRepository.save(ride);

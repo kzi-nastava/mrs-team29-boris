@@ -6,16 +6,22 @@ import com.example.backendspringboot.model.*;
 import com.example.backendspringboot.repositories.*;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 import org.mockito.ArgumentCaptor;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.mock.web.MockMultipartFile;
 
 import java.time.LocalDateTime;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
 class ProfileServiceTest {
+    @TempDir
+    Path imageDirectory;
     private UserRepository userRepository;
     private VehicleRepository vehicleRepository;
     private DriverProfileChangeRequestRepository changeRepository;
@@ -29,6 +35,7 @@ class ProfileServiceTest {
         service = new ProfileService(userRepository, vehicleRepository,
                 mock(RideRepository.class), mock(GuestRideRepository.class),
                 changeRepository, mock(PasswordEncoder.class));
+        service.useImageDirectory(imageDirectory);
     }
 
     @Test
@@ -87,6 +94,30 @@ class ProfileServiceTest {
                 now.minusHours(26), now.minusHours(22), now.minusHours(24), now));
         assertEquals(30, ProfileService.overlapMinutes(
                 now.minusMinutes(30), null, now.minusHours(24), now));
+    }
+
+    @Test
+    void passengerImageIsStoredAndCanBeDeleted() throws Exception {
+        Passenger passenger = new Passenger();
+        passenger.setId(2L);
+        passenger.setName("Ana");
+        passenger.setSurname("Anić");
+        passenger.setEmail("ana@example.com");
+        passenger.setGender(Gender.FEMALE);
+        passenger.setAddress("Adresa");
+        passenger.setPhone("0641234567");
+        when(userRepository.findById(2L)).thenReturn(Optional.of(passenger));
+        MockMultipartFile image = new MockMultipartFile(
+                "file", "photo.png", "image/png", new byte[]{1, 2, 3});
+
+        String imageUrl = service.uploadOwnImage(passenger, image).getProfileImageUrl();
+        Path stored = imageDirectory.resolve(imageUrl.substring(imageUrl.lastIndexOf('/') + 1));
+        assertTrue(Files.exists(stored));
+        assertEquals(imageUrl, passenger.getProfileImageUrl());
+
+        service.deleteOwnImage(passenger);
+        assertFalse(Files.exists(stored));
+        assertNull(passenger.getProfileImageUrl());
     }
 
     private Driver driver() {

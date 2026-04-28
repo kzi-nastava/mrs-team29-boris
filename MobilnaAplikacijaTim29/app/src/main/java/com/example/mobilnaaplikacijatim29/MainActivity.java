@@ -22,6 +22,8 @@ import com.example.mobilnaaplikacijatim29.ui.auth.ForgotPasswordFragment;
 import com.example.mobilnaaplikacijatim29.ui.auth.LoginFragment;
 import com.example.mobilnaaplikacijatim29.ui.auth.ResetPasswordFragment;
 import com.example.mobilnaaplikacijatim29.ui.driver.DriverDashboardFragment;
+import com.example.mobilnaaplikacijatim29.ui.driver.DriverRideDetailFragment;
+import com.example.mobilnaaplikacijatim29.ui.driver.DriverRideHistoryFragment;
 import com.example.mobilnaaplikacijatim29.ui.home.HomeFragment;
 import com.example.mobilnaaplikacijatim29.ui.passenger.PassengerDashboardFragment;
 import com.example.mobilnaaplikacijatim29.ui.profile.ProfileFragment;
@@ -91,6 +93,14 @@ public class MainActivity extends AppCompatActivity {
         bottomNavigation.setSelectedItemId(R.id.nav_dashboard);
     }
 
+    public void navigateToDriverRideDetail(long rideId, boolean guest) {
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container,
+                        DriverRideDetailFragment.newInstance(rideId, guest))
+                .addToBackStack(null)
+                .commit();
+    }
+
     public void requestLogout(LogoutCallback callback) {
         if (!sessionManager.isLoggedIn()) {
             finishLogout();
@@ -157,6 +167,8 @@ public class MainActivity extends AppCompatActivity {
             fragment = new ProfileFragment();
         } else if (destinationId == R.id.nav_profile_change_requests) {
             fragment = new ProfileChangeRequestsFragment();
+        } else if (destinationId == R.id.nav_driver_ride_history) {
+            fragment = new DriverRideHistoryFragment();
         } else if (destinationId == R.id.nav_forgot_password) {
             fragment = new ForgotPasswordFragment();
         } else if (destinationId == R.id.nav_reset_password) {

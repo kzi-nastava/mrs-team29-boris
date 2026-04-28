@@ -14,6 +14,7 @@ import java.util.List;
 @NoArgsConstructor @AllArgsConstructor
 public class DriverRideHistoryResponseDTO {
     private Long id;
+    private LocalDateTime createdAt;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
     private LocationDTO origin;
@@ -23,8 +24,13 @@ public class DriverRideHistoryResponseDTO {
 
     private List<InconsistencyReportResponseDTO> inconsistencyReports;
 
-    private List<String> passengerEmails;
+    private List<RidePassengerResponseDTO> passengers;
+    private List<RideReviewResponseDTO> reviews;
     private boolean panicPressed;
 
     private String status;
+    private boolean canceled;
+    private String canceledBy;
+    private String cancellationReason;
+    private boolean guest;
 }

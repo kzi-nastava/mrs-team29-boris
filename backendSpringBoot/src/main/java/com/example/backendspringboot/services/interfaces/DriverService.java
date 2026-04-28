@@ -10,6 +10,7 @@ import com.example.backendspringboot.model.Driver;
 
 import java.util.List;
 import java.util.Optional;
+import java.time.LocalDate;
 
 public interface DriverService {
     DriverRegistrationResponseDTO registerDriver(
@@ -20,7 +21,10 @@ public interface DriverService {
     void completeRegistration(CompleteRegistrationRequestDTO request);
     boolean isTokenValid(String token);
     VehicleResponseDTO getDriverVehicle(Long id);
-    List<DriverRideHistoryResponseDTO> getDriverRideHistory(Long driverId);
+    List<DriverRideHistoryResponseDTO> getDriverRideHistory(
+            Long driverId, LocalDate from, LocalDate to);
+    DriverRideHistoryResponseDTO getDriverRideHistoryDetail(
+            Long driverId, Long rideId, boolean guest);
 
     boolean isOwnerOrAdmin(Long id);
     List<UserProfileResponseDTO> getAllDrivers();

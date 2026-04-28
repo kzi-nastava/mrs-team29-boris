@@ -27,6 +27,9 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.util.Comparator;
+import java.util.Collections;
 import java.util.stream.Collectors;
 import org.springframework.web.util.UriComponentsBuilder;
 
@@ -44,7 +47,8 @@ public class DriverServiceImpl implements DriverService {
     private final GuestRideRepository guestRideRepository;
 
     @Override
-    public List<DriverRideHistoryResponseDTO> getDriverRideHistory(Long driverId) {
+    public List<DriverRideHistoryResponseDTO> getDriverRideHistory(
+            Long driverId, LocalDate from, LocalDate to) {
         // --- SECURITY ---
         if (!isOwnerOrAdmin(driverId)) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Nemate pristup ovim podacima.");
@@ -54,50 +58,80 @@ public class DriverServiceImpl implements DriverService {
         List<DriverRideHistoryResponseDTO> dtos = new ArrayList<>();
 
         for (Ride ride : rides) {
-            if (ride.getStatus() != RideStatus.FINISHED
-                    && ride.getStatus() != RideStatus.STOPPED) continue;
-
-            // DTO Mapping
-            DriverRideHistoryResponseDTO dto = getRideHistoryResponseDTO(ride);
-            dtos.add(dto);
+            if (isHistorical(ride.getStatus())
+                    && isWithinDateRange(historyDate(ride.getStartTime(), ride.getCreatedAt()), from, to)) {
+                dtos.add(getRideHistoryResponseDTO(ride));
+            }
         }
 
         List<GuestRide>  guestRides = guestRideRepository.findAllByDriverId(driverId);
         for (GuestRide guestRide : guestRides) {
-            if (guestRide.getStatus() != RideStatus.FINISHED
-                    && guestRide.getStatus() != RideStatus.STOPPED) continue;
-
-            DriverRideHistoryResponseDTO dto = getGuestRideHistoryResponseDTO(guestRide);
-            dtos.add(dto);
-
+            if (isHistorical(guestRide.getStatus())
+                    && isWithinDateRange(historyDate(guestRide.getStartTime(), guestRide.getCreatedAt()), from, to)) {
+                dtos.add(getGuestRideHistoryResponseDTO(guestRide));
+            }
         }
-
+        dtos.sort(Comparator.comparing(DriverServiceImpl::dtoHistoryDate,
+                Comparator.nullsLast(Comparator.reverseOrder())));
         return dtos;
+    }
+
+    @Override
+    public DriverRideHistoryResponseDTO getDriverRideHistoryDetail(
+            Long driverId, Long rideId, boolean guest) {
+        if (!isOwnerOrAdmin(driverId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        if (guest) {
+            GuestRide ride = guestRideRepository.findById(rideId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+            if (ride.getDriver() == null || !ride.getDriver().getId().equals(driverId)) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+            }
+            return getGuestRideHistoryResponseDTO(ride);
+        }
+        Ride ride = rideRepository.findById(rideId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND));
+        if (ride.getDriver() == null || !ride.getDriver().getId().equals(driverId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN);
+        }
+        return getRideHistoryResponseDTO(ride);
     }
 
     private static DriverRideHistoryResponseDTO getRideHistoryResponseDTO(Ride ride) {
         DriverRideHistoryResponseDTO dto = new DriverRideHistoryResponseDTO();
         dto.setId(ride.getId());
+        dto.setCreatedAt(ride.getCreatedAt());
         dto.setStartTime(ride.getStartTime());
         dto.setEndTime(ride.getEndTime());
         dto.setTotalPrice(ride.getPrice());
         dto.setPanicPressed(ride.isPanicPressed());
 
-        /// set ride status
-        if(ride.getStatus() == RideStatus.FINISHED){
-            dto.setStatus("Completed");
-        }
-        if(ride.getStatus() == RideStatus.STOPPED){
-            dto.setStatus("Stopped");
-        }
-
-        /// Check on front if this is even sent
-        List<String> passengerEmails = new ArrayList<>();
-        for(Passenger p : ride.getPassengers()) {
-            passengerEmails.add(p.getEmail());
-        }
-
-        dto.setPassengerEmails(passengerEmails);
+        dto.setStatus(ride.getStatus() == null ? null : ride.getStatus().name());
+        dto.setCanceled(ride.getStatus() == RideStatus.CANCELED);
+        dto.setCanceledBy(ride.getCancelledBy() == null ? null : ride.getCancelledBy().getEmail());
+        dto.setCancellationReason(ride.getCancellationReason());
+        dto.setGuest(false);
+        List<Passenger> ridePassengers = ride.getPassengers() == null
+                ? Collections.emptyList() : ride.getPassengers();
+        dto.setPassengers(ridePassengers.stream().map(passenger ->
+                new com.example.backendspringboot.dto.response.RidePassengerResponseDTO(
+                        passenger.getId(), passenger.getName(), passenger.getSurname(),
+                        passenger.getEmail(), passenger.getPhone(), passenger.getProfileImageUrl()))
+                .toList());
+        List<Review> reviews = ride.getReviews() == null ? Collections.emptyList() : ride.getReviews();
+        dto.setReviews(reviews.stream().map(review ->
+                new com.example.backendspringboot.dto.response.RideReviewResponseDTO(
+                        review.getPassenger() == null ? null : review.getPassenger().getEmail(),
+                        review.getDriverRating(), review.getVehicleRating(), review.getComment(),
+                        review.getCreationTime())).toList());
+        List<InconsistencyReport> reports = ride.getInconsistencyReports() == null
+                ? Collections.emptyList() : ride.getInconsistencyReports();
+        dto.setInconsistencyReports(reports.stream().map(report ->
+                new com.example.backendspringboot.dto.response.InconsistencyReportResponseDTO(
+                        report.getId(), report.getNote(), report.getCreatedAt(),
+                        report.getPassenger() == null ? null : report.getPassenger().getEmail(),
+                        ride.getId())).toList());
 
         if (ride.getRoute() != null) {
             Location start = ride.getRoute().getOrigin();
@@ -111,12 +145,20 @@ public class DriverServiceImpl implements DriverService {
     private static DriverRideHistoryResponseDTO getGuestRideHistoryResponseDTO(GuestRide guestRide) {
         DriverRideHistoryResponseDTO dto = new DriverRideHistoryResponseDTO();
         dto.setId(guestRide.getId());
+        dto.setCreatedAt(guestRide.getCreatedAt());
         dto.setStartTime(guestRide.getStartTime());
         dto.setEndTime(guestRide.getEndTime());
         dto.setTotalPrice(guestRide.getPrice());
-        dto.setPanicPressed(false);
-
-        // Guest can't add passenger emails, so it will be null here
+        dto.setPanicPressed(guestRide.isPanicPressed());
+        dto.setPassengers(Collections.emptyList());
+        dto.setReviews(Collections.emptyList());
+        dto.setInconsistencyReports(Collections.emptyList());
+        dto.setStatus(guestRide.getStatus() == null ? null : guestRide.getStatus().name());
+        dto.setCanceled(guestRide.getStatus() == RideStatus.CANCELED);
+        dto.setCanceledBy(guestRide.getCancelledBy() == null
+                ? null : guestRide.getCancelledBy().getEmail());
+        dto.setCancellationReason(guestRide.getCancellationReason());
+        dto.setGuest(true);
 
         if(guestRide.getRoute() != null) {
             Location start = guestRide.getRoute().getOrigin();
@@ -125,14 +167,26 @@ public class DriverServiceImpl implements DriverService {
             dto.setDestination(new LocationDTO(end.getLongitude(), end.getLatitude(), end.getAddress()));
         }
 
-        if(guestRide.getStatus() == RideStatus.FINISHED){
-            dto.setStatus("Completed");
-        }
-        if(guestRide.getStatus() == RideStatus.STOPPED){
-            dto.setStatus("Stopped");
-        }
-
         return dto;
+    }
+
+    private static boolean isHistorical(RideStatus status) {
+        return status == RideStatus.FINISHED || status == RideStatus.STOPPED
+                || status == RideStatus.CANCELED || status == RideStatus.FAILED;
+    }
+
+    private static LocalDateTime historyDate(LocalDateTime start, LocalDateTime created) {
+        return start != null ? start : created;
+    }
+
+    private static LocalDateTime dtoHistoryDate(DriverRideHistoryResponseDTO dto) {
+        return historyDate(dto.getStartTime(), dto.getCreatedAt());
+    }
+
+    private static boolean isWithinDateRange(LocalDateTime value, LocalDate from, LocalDate to) {
+        if (value == null) return from == null && to == null;
+        LocalDate date = value.toLocalDate();
+        return (from == null || !date.isBefore(from)) && (to == null || !date.isAfter(to));
     }
 
     @Override

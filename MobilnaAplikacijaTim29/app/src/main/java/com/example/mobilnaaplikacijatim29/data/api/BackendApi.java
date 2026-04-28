@@ -32,8 +32,23 @@ import com.example.mobilnaaplikacijatim29.data.model.ProfileResponse;
 import com.example.mobilnaaplikacijatim29.data.model.ProfileUpdateRequest;
 import com.example.mobilnaaplikacijatim29.data.model.PasswordChangeRequest;
 import com.example.mobilnaaplikacijatim29.data.model.DriverProfileChangeResponse;
+import com.example.mobilnaaplikacijatim29.data.model.DriverRideHistoryItem;
 
 public interface BackendApi {
+
+    @GET("api/drivers/{id}/ride-history")
+    Call<List<DriverRideHistoryItem>> getDriverRideHistory(
+            @Header("Authorization") String authorization,
+            @Path("id") long driverId,
+            @Query("from") String from,
+            @Query("to") String to);
+
+    @GET("api/drivers/{id}/ride-history/{rideId}")
+    Call<DriverRideHistoryItem> getDriverRideHistoryDetail(
+            @Header("Authorization") String authorization,
+            @Path("id") long driverId,
+            @Path("rideId") long rideId,
+            @Query("guest") boolean guest);
 
     @GET("api/vehicles/active")
     Call<List<ActiveVehicleResponse>> getActiveVehicles();
