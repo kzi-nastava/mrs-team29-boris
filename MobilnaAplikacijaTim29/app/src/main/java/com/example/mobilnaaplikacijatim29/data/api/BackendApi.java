@@ -33,8 +33,47 @@ import com.example.mobilnaaplikacijatim29.data.model.ProfileUpdateRequest;
 import com.example.mobilnaaplikacijatim29.data.model.PasswordChangeRequest;
 import com.example.mobilnaaplikacijatim29.data.model.DriverProfileChangeResponse;
 import com.example.mobilnaaplikacijatim29.data.model.DriverRideHistoryItem;
+import com.example.mobilnaaplikacijatim29.data.model.ReportRequest;
+import com.example.mobilnaaplikacijatim29.data.model.ReportResponse;
+import com.example.mobilnaaplikacijatim29.data.model.AdminReportUser;
+import com.example.mobilnaaplikacijatim29.data.model.BlockableUser;
+import com.example.mobilnaaplikacijatim29.data.model.BlockNoteRequest;
 
 public interface BackendApi {
+
+    @GET("api/admin/drivers/all")
+    Call<List<BlockableUser>> getAllDriversForBlocking(
+            @Header("Authorization") String authorization);
+
+    @GET("api/admin/passengers/all")
+    Call<List<BlockableUser>> getAllPassengersForBlocking(
+            @Header("Authorization") String authorization);
+
+    @PUT("api/admin/users/{id}/block")
+    Call<BlockableUser> blockUser(
+            @Header("Authorization") String authorization,
+            @Path("id") long userId,
+            @Body BlockNoteRequest request);
+
+    @PUT("api/admin/users/{id}/unblock")
+    Call<BlockableUser> unblockUser(
+            @Header("Authorization") String authorization,
+            @Path("id") long userId);
+
+    @PUT("api/admin/users/{id}/note")
+    Call<BlockableUser> updateBlockNote(
+            @Header("Authorization") String authorization,
+            @Path("id") long userId,
+            @Body BlockNoteRequest request);
+
+    @POST("api/reports/generate")
+    Call<ReportResponse> generateReport(
+            @Header("Authorization") String authorization,
+            @Body ReportRequest request);
+
+    @GET("api/admin/users")
+    Call<List<AdminReportUser>> getReportUsers(
+            @Header("Authorization") String authorization);
 
     @GET("api/drivers/{id}/ride-history")
     Call<List<DriverRideHistoryItem>> getDriverRideHistory(

@@ -7,6 +7,7 @@ import com.example.backendspringboot.repositories.DriverRepository;
 import com.example.backendspringboot.repositories.GuestRideRepository;
 import com.example.backendspringboot.repositories.LocationRepository;
 import com.example.backendspringboot.repositories.RouteRepository;
+import com.example.backendspringboot.repositories.VehiclePriceRepository;
 import com.example.backendspringboot.services.interfaces.GuestRideService;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
@@ -24,6 +25,7 @@ public class GuestRideServiceImpl implements GuestRideService {
     private final LocationRepository locationRepository;
     private final RouteRepository routeRepository;
     private final DriverRepository driverRepository;
+    private final VehiclePriceRepository vehiclePriceRepository;
 
     @Transactional
     public GuestRideResponseDTO createGuestRide(RideRequestUnregisteredDTO request) {
@@ -63,11 +65,31 @@ public class GuestRideServiceImpl implements GuestRideService {
         ride.setStatus(RideStatus.CREATED);
         ride.setScheduledTime(LocalDateTime.now());
 
-        List<Driver> availableDrivers = driverRepository.findAll();
+        List<Driver> availableDrivers = driverRepository.findAll().stream()
+                .filter(driver -> !driver.isBlocked())
+                .filter(driver -> driver.getStatus() == DriverStatus.ACTIVE)
+                .filter(driver -> !driver.isDeactivateAfterRide())
+                .toList();
         if (!availableDrivers.isEmpty()) {
             Driver driver = availableDrivers.get(0);
             ride.setDriver(driver);
             ride.setStatus(RideStatus.SCHEDULED);
+            VehicleType vehicleType = driver.getVehicle() == null
+                    || driver.getVehicle().getType() == null
+                    ? VehicleType.STANDARD : driver.getVehicle().getType();
+            VehiclePrice price = vehiclePriceRepository.findTopBy()
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND, "Vehicle price not found"));
+            double basePrice = switch (vehicleType) {
+                case LUXURY -> price.getLuxury();
+                case VAN -> price.getVan();
+                default -> price.getStandard();
+            };
+            ride.setVehicleTypeAtBooking(vehicleType);
+            ride.setBasePriceAtBooking(basePrice);
+            ride.setPricePerKmAtBooking(price.getPerKm());
+            ride.setDistanceKm(distanceKm);
+            ride.setPrice(Math.round(basePrice + distanceKm * price.getPerKm()));
         }
 
         guestRideRepository.save(ride);

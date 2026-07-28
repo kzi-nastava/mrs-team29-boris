@@ -192,7 +192,8 @@ public class AdminController {
 
     // 2.14: UPDATE prices
     @PutMapping("/prices")
-    public ResponseEntity<VehiclePriceDTO> updateVehiclePrices(@RequestBody VehiclePriceDTO request) {
+    public ResponseEntity<VehiclePriceDTO> updateVehiclePrices(
+            @Valid @RequestBody VehiclePriceDTO request) {
         VehiclePriceDTO updated = priceService.updatePrices(request);
         return ResponseEntity.ok(updated);
     }

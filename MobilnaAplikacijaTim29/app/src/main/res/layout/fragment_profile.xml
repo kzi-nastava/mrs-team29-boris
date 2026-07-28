@@ -67,6 +67,11 @@
 
         <LinearLayout android:id="@+id/profile_driver_section" android:layout_width="match_parent"
             android:layout_height="wrap_content" android:orientation="vertical" android:visibility="gone">
+            <TextView android:id="@+id/profile_block_notice"
+                android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="14dp" android:padding="12dp"
+                android:textColor="?attr/colorError" android:textStyle="bold"
+                android:visibility="gone" />
             <TextView android:id="@+id/profile_active_hours" android:layout_width="match_parent"
                 android:layout_height="wrap_content" android:layout_marginTop="18dp"
                 android:textStyle="bold" />

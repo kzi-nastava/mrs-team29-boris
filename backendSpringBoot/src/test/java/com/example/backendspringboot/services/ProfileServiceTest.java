@@ -120,6 +120,21 @@ class ProfileServiceTest {
         assertNull(passenger.getProfileImageUrl());
     }
 
+    @Test
+    void driverProfileContainsAdministratorBlockNote() {
+        Driver driver = driver();
+        driver.setBlocked(true);
+        driver.setBlockReason("Dokumentacija vozila nije važeća");
+        when(userRepository.findById(1L)).thenReturn(Optional.of(driver));
+        when(changeRepository.findFirstByDriverIdAndStatus(1L, ProfileChangeStatus.PENDING))
+                .thenReturn(Optional.empty());
+
+        var profile = service.getOwnProfile(driver);
+
+        assertTrue(profile.isBlocked());
+        assertEquals("Dokumentacija vozila nije važeća", profile.getBlockReason());
+    }
+
     private Driver driver() {
         Vehicle vehicle = new Vehicle();
         vehicle.setId(10L);

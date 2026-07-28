@@ -52,4 +52,10 @@ public class GuestRide {
     private boolean panicPressed;
 
     private double price;
+
+    @Enumerated(EnumType.STRING)
+    private VehicleType vehicleTypeAtBooking;
+    private double basePriceAtBooking;
+    private double pricePerKmAtBooking;
+    private double distanceKm;
 }

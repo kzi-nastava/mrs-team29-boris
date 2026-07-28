@@ -64,6 +64,13 @@ public class Ride {
     private Route route;
 
     private double price;
+
+    @Enumerated(EnumType.STRING)
+    private VehicleType vehicleTypeAtBooking;
+    private double basePriceAtBooking;
+    private double pricePerKmAtBooking;
+    private double distanceKm;
+
     private boolean isBabyFriendly;
     private boolean isPetFriendly;
 

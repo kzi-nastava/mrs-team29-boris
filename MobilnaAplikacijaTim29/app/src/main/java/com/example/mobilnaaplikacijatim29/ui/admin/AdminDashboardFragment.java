@@ -36,6 +36,14 @@ public class AdminDashboardFragment extends Fragment {
         profileRequests.setVisibility(View.VISIBLE);
         profileRequests.setOnClickListener(v ->
                 ((MainActivity) requireActivity()).navigateTo(R.id.nav_profile_change_requests));
+        View userBlocking = view.findViewById(R.id.admin_user_blocking);
+        userBlocking.setVisibility(View.VISIBLE);
+        userBlocking.setOnClickListener(v ->
+                ((MainActivity) requireActivity()).navigateTo(R.id.nav_user_blocking));
+        View reports = view.findViewById(R.id.reports_button);
+        reports.setVisibility(View.VISIBLE);
+        reports.setOnClickListener(v ->
+                ((MainActivity) requireActivity()).navigateTo(R.id.nav_reports));
         view.findViewById(R.id.dashboard_logout).setOnClickListener(v ->
                 ((MainActivity) requireActivity()).requestLogout(message -> showMessage(view, message)));
     }

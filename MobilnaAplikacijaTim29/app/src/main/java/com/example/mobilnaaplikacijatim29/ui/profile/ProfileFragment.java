@@ -90,6 +90,15 @@ public class ProfileFragment extends Fragment {
                 value.isProfileChangePending() ? View.VISIBLE : View.GONE);
         boolean driver = "driver".equalsIgnoreCase(value.getRole());
         root.findViewById(R.id.profile_driver_section).setVisibility(driver ? View.VISIBLE : View.GONE);
+        TextView blockNotice = root.findViewById(R.id.profile_block_notice);
+        blockNotice.setVisibility(driver && value.isBlocked() ? View.VISIBLE : View.GONE);
+        if (driver && value.isBlocked()) {
+            String reason = value.getBlockReason() == null || value.getBlockReason().isBlank()
+                    ? "Administrator nije uneo napomenu."
+                    : value.getBlockReason();
+            blockNotice.setText("Nalog je blokiran. Ne možete dobijati nove vožnje.\nNapomena administratora: "
+                    + reason);
+        }
         if (driver && value.getVehicle() != null) {
             int minutes = value.getActiveMinutesLast24Hours() == null
                     ? 0 : value.getActiveMinutesLast24Hours();

@@ -94,8 +94,18 @@ public class UserServiceImpl implements UserService {
         }
 
         if (user instanceof Driver driver) {
-            driver.setStatus(DriverStatus.ACTIVE);
-            driver.setDeactivateAfterRide(false);
+            if (driver.isBlocked()) {
+                if (driver.getActiveRide() == null) {
+                    driver.setStatus(DriverStatus.INACTIVE);
+                    driver.setDeactivateAfterRide(false);
+                } else {
+                    driver.setStatus(DriverStatus.ACTIVE);
+                    driver.setDeactivateAfterRide(true);
+                }
+            } else {
+                driver.setStatus(DriverStatus.ACTIVE);
+                driver.setDeactivateAfterRide(false);
+            }
             userRepository.save(driver);
         }
 
@@ -187,6 +197,10 @@ public class UserServiceImpl implements UserService {
         }
 
         if (request.getStatus() == DriverStatus.ACTIVE) {
+            if (driver.isBlocked()) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                        "Blocked driver cannot become active");
+            }
             driver.setStatus(DriverStatus.ACTIVE);
             driver.setDeactivateAfterRide(false);
         } else if (driver.getActiveRide() != null) {
@@ -473,10 +487,24 @@ public class UserServiceImpl implements UserService {
     public UserProfileResponseDTO blockUser(Long id, String reason) {
         User user = userRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("User not found"));
 
+        if (user instanceof Administrator) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Administrators cannot be blocked");
+        }
+
         // Block him
         user.setBlocked(true);
-        if (reason != null && !reason.trim().isEmpty()) {
-            user.setBlockReason(reason);
+        String normalizedReason = reason == null ? null : reason.trim();
+        if (normalizedReason != null && !normalizedReason.isEmpty()) {
+            user.setBlockReason(normalizedReason);
+        }
+        if (user instanceof Driver driver) {
+            if (driver.getActiveRide() == null) {
+                driver.setStatus(DriverStatus.INACTIVE);
+                driver.setDeactivateAfterRide(false);
+            } else {
+                driver.setDeactivateAfterRide(true);
+            }
         }
 
         userRepository.save(user);
@@ -486,12 +514,10 @@ public class UserServiceImpl implements UserService {
                 "/topic/user/" + id + "/status",
                 Map.of(
                         "blocked", true,
-                        "reason", reason != null ? reason : "",
+                        "reason", user.getBlockReason() != null ? user.getBlockReason() : "",
                         "timestamp", LocalDateTime.now().toString()
                 )
         );
-
-        System.out.println(reason);
 
         return new UserProfileResponseDTO(
                 user.getId(),
@@ -542,7 +568,14 @@ public class UserServiceImpl implements UserService {
     public UserProfileResponseDTO setNote(Long id, String reason) {
         User user = userRepository.findById(id).orElseThrow(() -> new EntityNotFoundException("User not found"));
 
-        user.setBlockReason(reason);
+        if (user instanceof Administrator) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Notes are intended for drivers and passengers");
+        }
+
+        String normalizedReason = reason == null ? null : reason.trim();
+        user.setBlockReason(normalizedReason == null || normalizedReason.isEmpty()
+                ? null : normalizedReason);
         userRepository.save(user);
 
         // Using websockets send updated message on why the user is blocked
@@ -550,7 +583,7 @@ public class UserServiceImpl implements UserService {
                 "/topic/user/" + id + "/status",
                 Map.of(
                         "blocked", user.isBlocked(),
-                        "reason", reason != null ? reason : "",
+                        "reason", user.getBlockReason() != null ? user.getBlockReason() : "",
                         "timestamp", LocalDateTime.now().toString()
                 )
         );

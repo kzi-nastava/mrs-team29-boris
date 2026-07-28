@@ -41,6 +41,15 @@
             android:text="Zahtevi za izmenu profila vozača"
             android:visibility="gone" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/admin_user_blocking"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Blokiranje vozača i putnika"
+            android:visibility="gone" />
+
         <LinearLayout
             android:id="@+id/driver_status_controls"
             android:layout_width="match_parent"
@@ -81,6 +90,15 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:text="Istorija mojih vožnji"
+            android:visibility="gone" />
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/reports_button"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Izveštaji o vožnjama"
             android:visibility="gone" />
 
         <TextView

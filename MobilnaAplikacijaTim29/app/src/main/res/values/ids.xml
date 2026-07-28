@@ -6,4 +6,6 @@
     <item name="nav_complete_driver_registration" type="id" />
     <item name="nav_profile_change_requests" type="id" />
     <item name="nav_driver_ride_history" type="id" />
+    <item name="nav_reports" type="id" />
+    <item name="nav_user_blocking" type="id" />
 </resources>

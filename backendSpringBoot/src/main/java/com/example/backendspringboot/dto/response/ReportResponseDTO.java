@@ -14,4 +14,5 @@ import java.util.List;
 public class ReportResponseDTO {
     private List<DailyStatsDTO> dailyStats;
     private SummaryStatsDTO summary;
+    private boolean earnings;
 }

@@ -70,6 +70,18 @@ public class DriverRepositoryTest {
     }
 
     @Test
+    public void whenDriverIsBlocked_thenReturnEmpty() {
+        Driver driver = createDriver(DriverStatus.ACTIVE, true, true, VehicleType.STANDARD);
+        driver.setBlocked(true);
+        entityManager.persistAndFlush(driver);
+
+        List<Driver> result = driverRepository.filterAvailableDrivers(
+                DriverStatus.ACTIVE, true, true, VehicleType.STANDARD);
+
+        assertTrue(result.isEmpty());
+    }
+
+    @Test
     public void whenBabyFriendlyDoesNotMatch_thenReturnEmpty() {
         createDriver(DriverStatus.ACTIVE, false, true, VehicleType.STANDARD);
 

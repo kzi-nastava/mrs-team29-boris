@@ -120,7 +120,11 @@ public class CreateRideServiceTest {
         passenger.setBlockReason("Smoking");
         when(passengerRepository.findById(1L)).thenReturn(Optional.of(passenger));
 
-        assertThrows(ResponseStatusException.class, () -> rideService.createRide(validRequest));
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> rideService.createRide(validRequest));
+
+        assertEquals(org.springframework.http.HttpStatus.FORBIDDEN, exception.getStatusCode());
+        assertEquals("Nalog je blokiran. Razlog: Smoking", exception.getReason());
     }
 
     // No availabl drivers

@@ -20,6 +20,10 @@ public class DriverRideHistoryResponseDTO {
     private LocationDTO origin;
     private LocationDTO destination;
     private double totalPrice;
+    private String vehicleTypeAtBooking;
+    private double basePriceAtBooking;
+    private double pricePerKmAtBooking;
+    private double distanceKm;
 
 
     private List<InconsistencyReportResponseDTO> inconsistencyReports;

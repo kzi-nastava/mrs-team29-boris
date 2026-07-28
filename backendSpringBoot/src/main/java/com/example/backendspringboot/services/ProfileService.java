@@ -283,7 +283,8 @@ public class ProfileService {
         }
         return new OwnProfileResponseDTO(user.getId(), user.getEmail(), user.getName(),
                 user.getSurname(), user.getGender(), user.getAddress(), user.getPhone(),
-                user.getProfileImageUrl(), role, activeMinutes, vehicle, pending);
+                user.getProfileImageUrl(), role, activeMinutes, vehicle, pending,
+                user.isBlocked(), user.getBlockReason());
     }
 
     private DriverProfileChangeResponseDTO mapChange(DriverProfileChangeRequest change) {
@@ -299,7 +300,8 @@ public class ProfileService {
         OwnProfileResponseDTO proposed = new OwnProfileResponseDTO(driver.getId(),
                 change.getEmail(), change.getName(), change.getSurname(), change.getGender(),
                 change.getAddress(), change.getPhone(), image, "driver",
-                activeMinutesLast24Hours(driver), vehicle, true);
+                activeMinutesLast24Hours(driver), vehicle, true,
+                driver.isBlocked(), driver.getBlockReason());
         return new DriverProfileChangeResponseDTO(change.getId(), driver.getId(),
                 driver.getEmail(), change.getCreatedAt(), proposed);
     }

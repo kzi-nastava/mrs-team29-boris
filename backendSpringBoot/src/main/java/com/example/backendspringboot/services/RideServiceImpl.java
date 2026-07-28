@@ -78,7 +78,11 @@ public class RideServiceImpl implements RideService {
 
         // Check if creator is maybe blocked
         if (creator.isBlocked()) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Your are blocked! Reason " + creator.getBlockReason());
+            String reason = creator.getBlockReason() == null || creator.getBlockReason().isBlank()
+                    ? "Administrator nije uneo napomenu."
+                    : creator.getBlockReason();
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Nalog je blokiran. Razlog: " + reason);
         }
 
         // Create origin Location
@@ -115,6 +119,7 @@ public class RideServiceImpl implements RideService {
         ride.setRoute(route);
         ride.setBabyFriendly(request.isBabyFriendly());
         ride.setPetFriendly(request.isPetFriendly());
+        applyPriceSnapshot(ride, request.getVehicleType(), request.getDistanceKm());
 
         // Linked passengers
         List<Passenger> registeredPassengers = resolvePassengers(request.getPassengerEmails());
@@ -596,8 +601,10 @@ public class RideServiceImpl implements RideService {
 
         Driver driver = ride.getDriver();
         updateDriverAndVehicleAfterRide(driver, distance, ride.getRoute(), (dist, type) -> {
-            double price = calculateRidePrice(dist, type);
-            ride.setPrice(price);
+            ensurePriceSnapshot(ride, type);
+            ride.setDistanceKm(dist);
+            ride.setPrice(calculateSnapshotPrice(
+                    dist, ride.getBasePriceAtBooking(), ride.getPricePerKmAtBooking()));
             ride.getRoute().setDistance(dist);
             rideRepository.save(ride);
             sendSummaryEmails(ride);
@@ -624,8 +631,10 @@ public class RideServiceImpl implements RideService {
         vehicle.setBusy(false);
         vehicle.setLocation(guestRide.getRoute().getDestination());
 
-        double price = calculateRidePrice(distance, vehicle.getType());
-        guestRide.setPrice(price);
+        ensurePriceSnapshot(guestRide, vehicle.getType());
+        guestRide.setDistanceKm(distance);
+        guestRide.setPrice(calculateSnapshotPrice(distance,
+                guestRide.getBasePriceAtBooking(), guestRide.getPricePerKmAtBooking()));
         guestRide.getRoute().setDistance(distance);
 
         driverRepository.save(driver);
@@ -655,24 +664,46 @@ public class RideServiceImpl implements RideService {
         }
     }
 
-    private double calculateRidePrice(double distance, VehicleType vehicleType) {
-        double price = 0.0;
-        VehiclePrice vehiclePrice = vehiclePriceRepository
-                .findTopBy()
-                .orElseThrow(() -> new RuntimeException("Vehicle price not found"));
-        if (vehiclePrice == null) {
-            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Vehicle price not found");
-        }
-        switch (vehicleType) {
-            case LUXURY -> price += vehiclePrice.getLuxury();
-            case VAN ->  price += vehiclePrice.getVan();
-            default -> price += vehiclePrice.getStandard();
-        }
-//        System.out.println("DEBUG: Racunam cenu za distancu: " + distance);
+    private void applyPriceSnapshot(Ride ride, VehicleType vehicleType, double distance) {
+        VehiclePrice price = currentVehiclePrice();
+        ride.setVehicleTypeAtBooking(vehicleType);
+        ride.setBasePriceAtBooking(basePrice(price, vehicleType));
+        ride.setPricePerKmAtBooking(price.getPerKm());
+        ride.setDistanceKm(distance);
+        ride.setPrice(calculateSnapshotPrice(distance,
+                ride.getBasePriceAtBooking(), ride.getPricePerKmAtBooking()));
+    }
 
-        price += distance * vehiclePrice.getPerKm();
-        return (double) Math.round(price);
+    private void ensurePriceSnapshot(Ride ride, VehicleType fallbackType) {
+        if (ride.getBasePriceAtBooking() > 0 && ride.getPricePerKmAtBooking() > 0) return;
+        applyPriceSnapshot(ride, fallbackType,
+                ride.getRoute() == null ? 0 : ride.getRoute().getDistance());
+    }
 
+    private void ensurePriceSnapshot(GuestRide ride, VehicleType fallbackType) {
+        if (ride.getBasePriceAtBooking() > 0 && ride.getPricePerKmAtBooking() > 0) return;
+        VehiclePrice price = currentVehiclePrice();
+        ride.setVehicleTypeAtBooking(fallbackType);
+        ride.setBasePriceAtBooking(basePrice(price, fallbackType));
+        ride.setPricePerKmAtBooking(price.getPerKm());
+    }
+
+    private VehiclePrice currentVehiclePrice() {
+        return vehiclePriceRepository.findTopBy()
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Vehicle price not found"));
+    }
+
+    private static double basePrice(VehiclePrice price, VehicleType vehicleType) {
+        return switch (vehicleType) {
+            case LUXURY -> price.getLuxury();
+            case VAN -> price.getVan();
+            default -> price.getStandard();
+        };
+    }
+
+    private static double calculateSnapshotPrice(double distance, double base, double perKm) {
+        return (double) Math.round(base + distance * perKm);
     }
 
     private void sendSummaryEmails(Ride ride) {

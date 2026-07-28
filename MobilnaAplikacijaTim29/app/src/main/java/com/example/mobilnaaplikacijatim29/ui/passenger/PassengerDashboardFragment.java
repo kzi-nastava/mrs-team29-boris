@@ -29,6 +29,10 @@ public class PassengerDashboardFragment extends Fragment {
         ((TextView) view.findViewById(R.id.dashboard_subtitle))
                 .setText("Dobro došli, " + session.getEmail()
                         + ". Funkcije poručivanja vožnje biće dodate u narednom koraku.");
+        View reports = view.findViewById(R.id.reports_button);
+        reports.setVisibility(View.VISIBLE);
+        reports.setOnClickListener(v ->
+                ((MainActivity) requireActivity()).navigateTo(R.id.nav_reports));
         view.findViewById(R.id.dashboard_logout).setOnClickListener(v ->
                 ((MainActivity) requireActivity()).requestLogout(message -> {
                     TextView messageView = view.findViewById(R.id.dashboard_message);

@@ -5,13 +5,13 @@ import com.example.backendspringboot.dto.SummaryStatsDTO;
 import com.example.backendspringboot.dto.request.ReportRequestDTO;
 import com.example.backendspringboot.dto.response.ReportResponseDTO;
 import com.example.backendspringboot.model.Driver;
+import com.example.backendspringboot.model.GuestRide;
 import com.example.backendspringboot.model.Passenger;
 import com.example.backendspringboot.model.Ride;
 import com.example.backendspringboot.model.User;
-import com.example.backendspringboot.repositories.DriverRepository;
-import com.example.backendspringboot.repositories.PassengerRepository;
 import com.example.backendspringboot.repositories.RideRepository;
 import com.example.backendspringboot.repositories.UserRepository;
+import com.example.backendspringboot.repositories.GuestRideRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -32,10 +32,15 @@ public class ReportServiceImpl {
 
     private final RideRepository rideRepository;
     private final UserRepository userRepository;
+    private final GuestRideRepository guestRideRepository;
+
+    private record ReportRide(LocalDateTime endTime, double kilometers, double money) { }
 
     public ReportResponseDTO generateReport(ReportRequestDTO request, String currentUserEmail, String currentUserRole) {
 
-        // Validate date
+        if (request == null || request.getDateFrom() == null || request.getDateTo() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Date range is required");
+        }
         if (request.getDateFrom().isAfter(request.getDateTo())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Date FROM cannot be after date TO");
         }
@@ -43,12 +48,12 @@ public class ReportServiceImpl {
         LocalDateTime dateFrom = request.getDateFrom().toLocalDate().atStartOfDay();
         LocalDateTime dateTo = request.getDateTo().toLocalDate().atTime(23, 59, 59);
 
-        List<Ride> rides;
+        List<ReportRide> rides;
         boolean isEarnings = false;
 
         if ("ADMIN".equals(currentUserRole)) {
             rides = getAdminRides(request, dateFrom, dateTo);
-            isEarnings = isEarningsReport(request.getUserType(), request.getUserId());
+            isEarnings = isEarningsReport(request.getUserType());
         }
         else {
             // Find user in database
@@ -60,7 +65,7 @@ public class ReportServiceImpl {
                 if (!(user instanceof Driver)) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Logged in user is not a Driver");
                 }
-                rides = rideRepository.findFinishedRidesByDriverAndDateRange(user.getId(), dateFrom, dateTo);
+                rides = driverRides(user.getId(), dateFrom, dateTo);
                 isEarnings = true;
             }
             else if ("PASSENGER".equals(currentUserRole)) {
@@ -68,7 +73,8 @@ public class ReportServiceImpl {
                 if (!(user instanceof Passenger)) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Logged in user is not a Passenger");
                 }
-                rides = rideRepository.findFinishedRidesByPassengerAndDateRange(user.getId(), dateFrom, dateTo);
+                rides = regularRides(rideRepository.findFinishedRidesByPassengerAndDateRange(
+                        user.getId(), dateFrom, dateTo));
                 isEarnings = false;
             }
             else {
@@ -79,7 +85,7 @@ public class ReportServiceImpl {
         return calculateReportStats(rides, dateFrom, dateTo, isEarnings);
     }
 
-    private List<Ride> getAdminRides(ReportRequestDTO request, LocalDateTime dateFrom, LocalDateTime dateTo) {
+    private List<ReportRide> getAdminRides(ReportRequestDTO request, LocalDateTime dateFrom, LocalDateTime dateTo) {
         String userType = request.getUserType();
 
         if (userType == null) {
@@ -87,18 +93,29 @@ public class ReportServiceImpl {
         }
 
         if ("ALL_DRIVERS".equals(userType)) {
-            return rideRepository.findAllFinishedRidesByDriversAndDateRange(dateFrom, dateTo);
+            List<ReportRide> rides = new ArrayList<>(regularRides(
+                    rideRepository.findAllFinishedRidesByDriversAndDateRange(dateFrom, dateTo)));
+            rides.addAll(guestRides(guestRideRepository.findAllFinishedByDriversAndDateRange(
+                    dateFrom, dateTo)));
+            return rides;
         } else if ("ALL_PASSENGERS".equals(userType)) {
-            return rideRepository.findAllFinishedRidesAndDateRange(dateFrom, dateTo);
+            return regularRides(rideRepository.findAllFinishedRidesAndDateRange(dateFrom, dateTo));
         } else if (request.getUserId() != null) {
             // Single user report
             User user = userRepository.findById(request.getUserId())
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
 
             if ("DRIVER".equals(userType)) {
-                return rideRepository.findFinishedRidesByDriverAndDateRange(user.getId(), dateFrom, dateTo);
+                if (!(user instanceof Driver)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selected user is not a driver");
+                }
+                return driverRides(user.getId(), dateFrom, dateTo);
             } else if ("PASSENGER".equals(userType)) {
-                return rideRepository.findFinishedRidesByPassengerAndDateRange(user.getId(), dateFrom, dateTo);
+                if (!(user instanceof Passenger)) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Selected user is not a passenger");
+                }
+                return regularRides(rideRepository.findFinishedRidesByPassengerAndDateRange(
+                        user.getId(), dateFrom, dateTo));
             } else {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid user type for single user report");
             }
@@ -107,23 +124,14 @@ public class ReportServiceImpl {
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid report request parameters");
     }
 
-    private boolean isEarningsReport(String userType, Long userId) {
-        if (userType.equals("ALL_DRIVERS") || userType.equals("DRIVER")) {
-            return true;
-        } else if (userType.equals("ALL_PASSENGERS") || userType.equals("PASSENGER")) {
-            return false;
-        } else if (userId != null) {
-            // Check if user is passenger or driver
-            User user = userRepository.findById(userId).orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
-            return user instanceof  Driver;
-        }
-
-        return false;
+    private static boolean isEarningsReport(String userType) {
+        return "ALL_DRIVERS".equals(userType) || "DRIVER".equals(userType);
     }
 
-    private ReportResponseDTO calculateReportStats(List<Ride> rides, LocalDateTime dateFrom, LocalDateTime dateTo, boolean isEarnings) {
+    private ReportResponseDTO calculateReportStats(List<ReportRide> rides, LocalDateTime dateFrom, LocalDateTime dateTo, boolean isEarnings) {
         // Group rides by day
-        Map<LocalDate, List<Ride>> ridesByDate = rides.stream().collect(Collectors.groupingBy(ride -> ride.getEndTime().toLocalDate()));
+        Map<LocalDate, List<ReportRide>> ridesByDate = rides.stream()
+                .collect(Collectors.groupingBy(ride -> ride.endTime().toLocalDate()));
 
         List<DailyStatsDTO> dailyStats = new ArrayList<>();
 
@@ -139,17 +147,13 @@ public class ReportServiceImpl {
         double cumulativeMoney = 0;
 
         for (LocalDate date = dateFrom.toLocalDate(); !date.isAfter(dateTo.toLocalDate()); date = date.plusDays(1)) {
-            List<Ride> dayRides = ridesByDate.getOrDefault(date, Collections.emptyList());
+            List<ReportRide> dayRides = ridesByDate.getOrDefault(date, Collections.emptyList());
 
             int numberOfRides = dayRides.size();
 
-            double dayKm = dayRides.stream().mapToDouble(r -> r.getRoute() != null ? r.getRoute().getDistance() : 0).sum();
+            double dayKm = dayRides.stream().mapToDouble(ReportRide::kilometers).sum();
 
-            double dayMoney = dayRides.stream().mapToDouble(Ride::getPrice).sum();
-
-            if (!isEarnings) {
-                dayMoney = -dayMoney; // Passengers are spending money
-            }
+            double dayMoney = dayRides.stream().mapToDouble(ReportRide::money).sum();
 
             cumulativeRides += numberOfRides;
             cumulativeKm += dayKm;
@@ -172,6 +176,32 @@ public class ReportServiceImpl {
                 Math.round((totalMoney / daysBetween) * 100.0) / 100.0
         );
 
-        return new ReportResponseDTO(dailyStats, summary);
+        return new ReportResponseDTO(dailyStats, summary, isEarnings);
+    }
+
+    private List<ReportRide> driverRides(Long driverId, LocalDateTime from, LocalDateTime to) {
+        List<ReportRide> result = new ArrayList<>(regularRides(
+                rideRepository.findFinishedRidesByDriverAndDateRange(driverId, from, to)));
+        result.addAll(guestRides(guestRideRepository.findFinishedByDriverAndDateRange(
+                driverId, from, to)));
+        return result;
+    }
+
+    private static List<ReportRide> regularRides(List<Ride> rides) {
+        return rides.stream()
+                .filter(ride -> ride.getEndTime() != null)
+                .map(ride -> new ReportRide(ride.getEndTime(),
+                        ride.getRoute() == null ? 0 : ride.getRoute().getDistance(),
+                        ride.getPrice()))
+                .toList();
+    }
+
+    private static List<ReportRide> guestRides(List<GuestRide> rides) {
+        return rides.stream()
+                .filter(ride -> ride.getEndTime() != null)
+                .map(ride -> new ReportRide(ride.getEndTime(),
+                        ride.getRoute() == null ? 0 : ride.getRoute().getDistance(),
+                        ride.getPrice()))
+                .toList();
     }
 }

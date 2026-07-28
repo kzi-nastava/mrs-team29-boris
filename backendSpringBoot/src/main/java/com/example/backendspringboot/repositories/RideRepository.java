@@ -20,7 +20,8 @@ public interface RideRepository extends JpaRepository<Ride, Long> {
     Page<Ride> findAllByDriverId(Long driverId, Pageable pageable);
     List<Ride> findAllByStatus(RideStatus status);
 
-    @Query("SELECT r FROM Ride r JOIN r.passengers p WHERE p.id = :passengerId " +
+    @Query("SELECT DISTINCT r FROM Ride r LEFT JOIN r.passengers p " +
+            "WHERE (p.id = :passengerId OR r.rideCreator.id = :passengerId) " +
             "AND r.status = 'FINISHED' " +
             "AND r.endTime BETWEEN :dateFrom AND :dateTo " +
             "ORDER BY r.endTime")

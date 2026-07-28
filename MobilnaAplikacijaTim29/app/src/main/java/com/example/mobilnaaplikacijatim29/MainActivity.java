@@ -28,6 +28,8 @@ import com.example.mobilnaaplikacijatim29.ui.home.HomeFragment;
 import com.example.mobilnaaplikacijatim29.ui.passenger.PassengerDashboardFragment;
 import com.example.mobilnaaplikacijatim29.ui.profile.ProfileFragment;
 import com.example.mobilnaaplikacijatim29.ui.admin.ProfileChangeRequestsFragment;
+import com.example.mobilnaaplikacijatim29.ui.admin.UserBlockingFragment;
+import com.example.mobilnaaplikacijatim29.ui.report.ReportsFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import retrofit2.Call;
@@ -169,6 +171,10 @@ public class MainActivity extends AppCompatActivity {
             fragment = new ProfileChangeRequestsFragment();
         } else if (destinationId == R.id.nav_driver_ride_history) {
             fragment = new DriverRideHistoryFragment();
+        } else if (destinationId == R.id.nav_reports) {
+            fragment = new ReportsFragment();
+        } else if (destinationId == R.id.nav_user_blocking) {
+            fragment = new UserBlockingFragment();
         } else if (destinationId == R.id.nav_forgot_password) {
             fragment = new ForgotPasswordFragment();
         } else if (destinationId == R.id.nav_reset_password) {

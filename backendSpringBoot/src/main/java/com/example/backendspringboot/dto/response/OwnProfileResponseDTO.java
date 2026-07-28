@@ -19,4 +19,6 @@ public class OwnProfileResponseDTO {
     private Integer activeMinutesLast24Hours;
     private ProfileVehicleResponseDTO vehicle;
     private boolean profileChangePending;
+    private boolean blocked;
+    private String blockReason;
 }
