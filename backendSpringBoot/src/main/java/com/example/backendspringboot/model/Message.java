@@ -21,6 +21,10 @@ public class Message {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @ManyToOne(fetch = FetchType.LAZY, optional = false)
+    @JoinColumn(name = "chat_id", nullable = false)
+    private Chat chat;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "sender_id", nullable = false)
     private User from;
@@ -29,7 +33,7 @@ public class Message {
     @JoinColumn(name = "receiver_id", nullable = false)
     private User to;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 2000)
     private String content;
 
     private boolean seen;

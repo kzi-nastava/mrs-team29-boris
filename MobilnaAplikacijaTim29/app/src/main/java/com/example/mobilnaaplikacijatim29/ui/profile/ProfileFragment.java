@@ -124,9 +124,13 @@ public class ProfileFragment extends Fragment {
         String email = text(R.id.profile_email);
         String address = text(R.id.profile_address);
         String phone = text(R.id.profile_phone);
-        if (name.length() < 2 || surname.isBlank() || address.isBlank() || phone.isBlank()
+        if (name.length() < 2 || surname.isBlank() || address.isBlank()
                 || !Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
             show("Popunite sva lična polja ispravnim podacima.", true);
+            return;
+        }
+        if (!phone.matches("^(\\+381|0)?[6-7]\\d{7,8}$")) {
+            show("Telefon mora biti u formatu 06... ili +3816...", true);
             return;
         }
         ProfileVehicleUpdateRequest vehicle = null;
@@ -209,7 +213,12 @@ public class ProfileFragment extends Fragment {
                 if (response.isSuccessful() && response.body() != null) {
                     populate(response.body());
                     show(successMessage, false);
-                } else show("Operacija nije uspela (HTTP " + response.code() + ").", true);
+                } else if (response.code() == 401 || response.code() == 403) {
+                    show("Sesija nije važeća ili je izgubljena. Prijavite se ponovo "
+                            + "(HTTP " + response.code() + ").", true);
+                } else {
+                    show("Operacija nije uspela (HTTP " + response.code() + ").", true);
+                }
             }
             @Override public void onFailure(@NonNull Call<ProfileResponse> call,
                                             @NonNull Throwable throwable) {

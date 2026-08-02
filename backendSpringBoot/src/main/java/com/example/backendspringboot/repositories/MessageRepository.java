@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import org.springframework.data.repository.query.Param;
 
 @Repository
 public interface MessageRepository extends JpaRepository<Message, Long> {
@@ -15,4 +16,17 @@ public interface MessageRepository extends JpaRepository<Message, Long> {
 
     @Query("SELECT DISTINCT m.from.email FROM Message m WHERE m.to.email = :adminEmail")
     List<String> findUserEmailsWhoChatedWithAdmin(String adminEmail);
+
+    @Query("""
+            SELECT m FROM Message m
+            WHERE m.chat.user.id = :userId
+            ORDER BY m.sentAt ASC, m.id ASC
+            """)
+    List<Message> findSupportMessagesForUser(@Param("userId") Long userId);
+
+    @Query("""
+            SELECT m FROM Message m
+            ORDER BY m.sentAt ASC, m.id ASC
+            """)
+    List<Message> findAllSupportMessages();
 }

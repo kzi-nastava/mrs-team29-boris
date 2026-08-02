@@ -85,6 +85,10 @@ class DriverRideHistoryServiceTest {
         ride.setCancellationReason("Putnik je odustao");
         ride.setPanicPressed(true);
         ride.setPrice(1234.5);
+        ride.setVehicleTypeAtBooking(VehicleType.LUXURY);
+        ride.setBasePriceAtBooking(500);
+        ride.setPricePerKmAtBooking(120);
+        ride.setDistanceKm(6.12);
         when(rideRepository.findById(9L)).thenReturn(Optional.of(ride));
 
         DriverRideHistoryResponseDTO result = service.getDriverRideHistoryDetail(7L, 9L, false);
@@ -93,6 +97,10 @@ class DriverRideHistoryServiceTest {
         assertEquals("ana@example.com", result.getCanceledBy());
         assertEquals("Putnik je odustao", result.getCancellationReason());
         assertEquals(1234.5, result.getTotalPrice());
+        assertEquals("LUXURY", result.getVehicleTypeAtBooking());
+        assertEquals(500, result.getBasePriceAtBooking());
+        assertEquals(120, result.getPricePerKmAtBooking());
+        assertEquals(6.12, result.getDistanceKm());
         assertTrue(result.isPanicPressed());
     }
 

@@ -78,7 +78,8 @@ public class UserServiceImpl implements UserService {
 
     public LoginResponseDTO login(LoginRequestDTO request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Invalid email or password"));
 
         if (user instanceof Passenger passenger && !passenger.isActivated()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account not activated. Check your email.");
@@ -90,7 +91,8 @@ public class UserServiceImpl implements UserService {
         }
 
         if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new RuntimeException("Wrong password");
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "Invalid email or password");
         }
 
         if (user instanceof Driver driver) {

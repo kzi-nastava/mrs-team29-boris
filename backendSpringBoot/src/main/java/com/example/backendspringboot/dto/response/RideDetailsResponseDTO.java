@@ -26,6 +26,10 @@ public class RideDetailsResponseDTO {
     private boolean canceled;
     private String canceledBy;
     private double price;
+    private String vehicleTypeAtBooking;
+    private double basePriceAtBooking;
+    private double pricePerKmAtBooking;
+    private double distanceKm;
     private boolean panicTriggered;
     private String status;
 

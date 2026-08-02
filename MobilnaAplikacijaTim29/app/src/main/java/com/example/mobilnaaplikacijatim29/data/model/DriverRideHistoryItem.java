@@ -11,6 +11,10 @@ public class DriverRideHistoryItem {
     private RideHistoryLocation origin;
     private RideHistoryLocation destination;
     private double totalPrice;
+    private String vehicleTypeAtBooking;
+    private double basePriceAtBooking;
+    private double pricePerKmAtBooking;
+    private double distanceKm;
     private List<InconsistencyReport> inconsistencyReports;
     private List<RidePassenger> passengers;
     private List<RideReview> reviews;
@@ -46,6 +50,10 @@ public class DriverRideHistoryItem {
     public RideHistoryLocation getOrigin() { return origin; }
     public RideHistoryLocation getDestination() { return destination; }
     public double getTotalPrice() { return totalPrice; }
+    public String getVehicleTypeAtBooking() { return vehicleTypeAtBooking; }
+    public double getBasePriceAtBooking() { return basePriceAtBooking; }
+    public double getPricePerKmAtBooking() { return pricePerKmAtBooking; }
+    public double getDistanceKm() { return distanceKm; }
     public List<InconsistencyReport> getInconsistencyReports() {
         return inconsistencyReports == null ? Collections.emptyList() : inconsistencyReports;
     }

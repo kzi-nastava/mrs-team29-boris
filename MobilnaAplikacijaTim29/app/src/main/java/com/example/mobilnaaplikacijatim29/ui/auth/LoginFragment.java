@@ -77,8 +77,15 @@ public class LoginFragment extends Fragment {
                                                @NonNull Response<LoginResponse> response) {
                             setLoading(false, progress, submit);
                             if (!response.isSuccessful() || response.body() == null) {
-                                showError(errorView, "Prijava nije uspela (HTTP "
-                                        + response.code() + "). Proverite podatke i aktivaciju naloga.");
+                                if (response.code() == 401) {
+                                    showError(errorView, "Email ili lozinka nisu ispravni.");
+                                } else if (response.code() == 403) {
+                                    showError(errorView, "Nalog nije aktiviran ili registracija "
+                                            + "nije završena. Proverite email.");
+                                } else {
+                                    showError(errorView, "Prijava nije uspela (HTTP "
+                                            + response.code() + "). Pokušajte ponovo.");
+                                }
                                 return;
                             }
 

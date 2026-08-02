@@ -71,6 +71,32 @@ class UserAuthServiceTest {
     }
 
     @Test
+    void unknownEmailReturnsUnauthorizedWithoutRevealingWhetherAccountExists() {
+        LoginRequestDTO request = loginRequest("missing@demo.com", "Password1");
+        when(userRepository.findByEmail(request.getEmail())).thenReturn(Optional.empty());
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> service.login(request));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());
+        assertEquals("Invalid email or password", exception.getReason());
+    }
+
+    @Test
+    void wrongPasswordReturnsSameUnauthorizedResponseAsUnknownEmail() {
+        Driver driver = driver(6L, DriverStatus.INACTIVE);
+        LoginRequestDTO request = loginRequest(driver.getEmail(), "WrongPassword1");
+        when(userRepository.findByEmail(driver.getEmail())).thenReturn(Optional.of(driver));
+        when(passwordEncoder.matches(request.getPassword(), driver.getPassword())).thenReturn(false);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> service.login(request));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());
+        assertEquals("Invalid email or password", exception.getReason());
+    }
+
+    @Test
     void inactiveRequestDuringRideIsDeferred() {
         Driver driver = driver(7L, DriverStatus.ACTIVE);
         driver.setActiveRide(new Ride());
@@ -130,5 +156,12 @@ class UserAuthServiceTest {
         driver.setStatus(status);
         driver.setDeactivateAfterRide(false);
         return driver;
+    }
+
+    private LoginRequestDTO loginRequest(String email, String password) {
+        LoginRequestDTO request = new LoginRequestDTO();
+        request.setEmail(email);
+        request.setPassword(password);
+        return request;
     }
 }

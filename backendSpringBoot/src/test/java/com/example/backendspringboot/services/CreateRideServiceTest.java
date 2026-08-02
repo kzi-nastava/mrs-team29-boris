@@ -23,6 +23,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.lenient;
 
 // Testing service for ordering a new ride by registered user
 @ExtendWith(MockitoExtension.class)
@@ -41,6 +42,8 @@ public class CreateRideServiceTest {
     private EmailService emailService;
     @Mock
     private SimpMessagingTemplate messagingTemplate;
+    @Mock
+    private VehiclePriceRepository vehiclePriceRepository;
 
     @InjectMocks
     private RideServiceImpl rideService;
@@ -74,6 +77,9 @@ public class CreateRideServiceTest {
         passenger = new Passenger();
         passenger.setId(1L);
         passenger.setBlocked(false);
+
+        lenient().when(vehiclePriceRepository.findTopBy()).thenReturn(Optional.of(
+                new VehiclePrice(1L, 150, 500, 250, 120)));
     }
 
     // Validate origin and destination are not the same
@@ -153,6 +159,7 @@ public class CreateRideServiceTest {
         RideResponseDTO response = rideService.createRide(validRequest);
 
         assertEquals(RideStatus.SCHEDULED, response.getStatus());
+        assertEquals(750, response.getPrice());
     }
 
     // Driver is blocked

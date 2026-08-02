@@ -54,7 +54,7 @@ public class BackendSpringBootApplication {
 				admin.setEmail("admin@demo.com");
 				admin.setPassword(passwordEncoder.encode("admin123"));
 				admin.setAddress("Admin Street 1");
-				admin.setPhone("123456789");
+				admin.setPhone("0601234567");
 				admin.setGender(Gender.MALE);
 				administratorRepository.save(admin);
 			}
@@ -167,7 +167,7 @@ public class BackendSpringBootApplication {
 				jovan.setEmail("passenger@demo.com");
 				jovan.setPassword(passwordEncoder.encode("passenger123"));
 				jovan.setActivated(true);
-				jovan.setPhone("555666777");
+				jovan.setPhone("0612345678");
 				jovan.setGender(Gender.MALE);
 				jovan.setAddress("Passenger Street 1");
 				// Odmah postavljamo omiljene rute dok je sesija otvorena i pre prvog save-a
@@ -204,7 +204,12 @@ public class BackendSpringBootApplication {
 					Passenger p = (Passenger) rideMatrix[i][1];
 					Route r = routes.get((int)rideMatrix[i][2]);
 
-					double finalPrice = Math.round(vp.getStandard() + (r.getDistance() * vp.getPerKm()));
+					double basePrice = switch (d.getVehicle().getType()) {
+						case LUXURY -> vp.getLuxury();
+						case VAN -> vp.getVan();
+						default -> vp.getStandard();
+					};
+					double finalPrice = Math.round(basePrice + (r.getDistance() * vp.getPerKm()));
 
 					Ride ride = new Ride();
 					ride.setDriver(d);
@@ -212,6 +217,10 @@ public class BackendSpringBootApplication {
 					ride.setPassengers(new ArrayList<>(List.of(p)));
 					ride.setRideCreator(p);
 					ride.setPrice(finalPrice);
+					ride.setVehicleTypeAtBooking(d.getVehicle().getType());
+					ride.setBasePriceAtBooking(basePrice);
+					ride.setPricePerKmAtBooking(vp.getPerKm());
+					ride.setDistanceKm(r.getDistance());
 					ride.setStartTime(LocalDateTime.now().minusDays(i+1).plusHours(i));
 					ride.setEndTime(LocalDateTime.now().minusDays(i+1).plusHours(i).plusMinutes(20));
 					if (i % 3 == 2) {

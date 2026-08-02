@@ -50,6 +50,15 @@
             android:text="Blokiranje vozača i putnika"
             android:visibility="gone" />
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/admin_vehicle_prices"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Definisanje cena vožnje"
+            android:visibility="gone" />
+
         <LinearLayout
             android:id="@+id/driver_status_controls"
             android:layout_width="match_parent"

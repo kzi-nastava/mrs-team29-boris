@@ -29,7 +29,10 @@ import com.example.mobilnaaplikacijatim29.ui.passenger.PassengerDashboardFragmen
 import com.example.mobilnaaplikacijatim29.ui.profile.ProfileFragment;
 import com.example.mobilnaaplikacijatim29.ui.admin.ProfileChangeRequestsFragment;
 import com.example.mobilnaaplikacijatim29.ui.admin.UserBlockingFragment;
+import com.example.mobilnaaplikacijatim29.ui.admin.VehiclePricingFragment;
 import com.example.mobilnaaplikacijatim29.ui.report.ReportsFragment;
+import com.example.mobilnaaplikacijatim29.ui.support.SupportChatFragment;
+import com.example.mobilnaaplikacijatim29.ui.support.SupportConversationsFragment;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import retrofit2.Call;
@@ -52,6 +55,13 @@ public class MainActivity extends AppCompatActivity {
         setContentView(R.layout.activity_main);
 
         sessionManager = new SessionManager(this);
+        // Development behavior: a fresh launcher start begins logged out. Do not
+        // clear the session when Android recreates the process while an external
+        // activity (for example the system image picker) is open.
+        if (savedInstanceState == null
+                && Intent.ACTION_MAIN.equals(getIntent().getAction())) {
+            sessionManager.clear();
+        }
         bottomNavigation = findViewById(R.id.bottom_navigation);
         bottomNavigation.setOnItemSelectedListener(item -> {
             showDestination(item.getItemId(), null);
@@ -103,6 +113,14 @@ public class MainActivity extends AppCompatActivity {
                 .commit();
     }
 
+    public void navigateToSupportChat(long userId, String userLabel) {
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container,
+                        SupportChatFragment.forAdministrator(userId, userLabel))
+                .addToBackStack(null)
+                .commit();
+    }
+
     public void requestLogout(LogoutCallback callback) {
         if (!sessionManager.isLoggedIn()) {
             finishLogout();
@@ -142,6 +160,7 @@ public class MainActivity extends AppCompatActivity {
         bottomNavigation.getMenu().findItem(R.id.nav_login).setVisible(!loggedIn);
         bottomNavigation.getMenu().findItem(R.id.nav_dashboard).setVisible(loggedIn);
         bottomNavigation.getMenu().findItem(R.id.nav_profile).setVisible(loggedIn);
+        bottomNavigation.getMenu().findItem(R.id.nav_support).setVisible(loggedIn);
         if (loggedIn) {
             String role = sessionManager.getRole();
             String title = "user".equalsIgnoreCase(role) ? "Putnik"
@@ -175,6 +194,11 @@ public class MainActivity extends AppCompatActivity {
             fragment = new ReportsFragment();
         } else if (destinationId == R.id.nav_user_blocking) {
             fragment = new UserBlockingFragment();
+        } else if (destinationId == R.id.nav_support) {
+            fragment = "admin".equalsIgnoreCase(sessionManager.getRole())
+                    ? new SupportConversationsFragment() : new SupportChatFragment();
+        } else if (destinationId == R.id.nav_vehicle_prices) {
+            fragment = new VehiclePricingFragment();
         } else if (destinationId == R.id.nav_forgot_password) {
             fragment = new ForgotPasswordFragment();
         } else if (destinationId == R.id.nav_reset_password) {

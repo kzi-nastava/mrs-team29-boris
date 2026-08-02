@@ -18,4 +18,9 @@
         android:icon="@android:drawable/ic_menu_myplaces"
         android:title="Profil"
         android:visible="false" />
+    <item
+        android:id="@+id/nav_support"
+        android:icon="@android:drawable/ic_dialog_email"
+        android:title="Podrška"
+        android:visible="false" />
 </menu>

@@ -8,4 +8,5 @@
     <item name="nav_driver_ride_history" type="id" />
     <item name="nav_reports" type="id" />
     <item name="nav_user_blocking" type="id" />
+    <item name="nav_vehicle_prices" type="id" />
 </resources>

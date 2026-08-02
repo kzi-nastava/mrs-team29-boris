@@ -846,6 +846,12 @@ public class RideServiceImpl implements RideService {
         dto.setStartTime(ride.getStartTime());
         dto.setEndTime(ride.getEndTime());
         dto.setTotalPrice(ride.getPrice());
+        dto.setVehicleTypeAtBooking(ride.getVehicleTypeAtBooking() == null
+                ? null : ride.getVehicleTypeAtBooking().name());
+        dto.setBasePriceAtBooking(ride.getBasePriceAtBooking());
+        dto.setPricePerKmAtBooking(ride.getPricePerKmAtBooking());
+        dto.setDistanceKm(ride.getDistanceKm() > 0 ? ride.getDistanceKm()
+                : ride.getRoute() == null ? 0 : ride.getRoute().getDistance());
 
         dto.setStatus(ride.getStatus().name());
 

@@ -21,6 +21,10 @@ public class PassengerRideDetailsResponseDTO {
     private String driverName;
 
     private Double totalPrice;
+    private String vehicleTypeAtBooking;
+    private double basePriceAtBooking;
+    private double pricePerKmAtBooking;
+    private double distanceKm;
     private LocalDateTime startTime;
     private LocalDateTime endTime;
 

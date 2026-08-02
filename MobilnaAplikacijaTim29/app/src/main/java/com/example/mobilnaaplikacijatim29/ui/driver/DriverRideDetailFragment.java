@@ -52,6 +52,7 @@ public class DriverRideDetailFragment extends Fragment {
     private TextView message;
     private TextView basicInfo;
     private TextView cancellationInfo;
+    private TextView pricingInfo;
     private TextView passengersInfo;
     private TextView reportsInfo;
     private TextView reviewsInfo;
@@ -78,6 +79,7 @@ public class DriverRideDetailFragment extends Fragment {
         message = view.findViewById(R.id.ride_detail_message);
         basicInfo = view.findViewById(R.id.ride_detail_basic);
         cancellationInfo = view.findViewById(R.id.ride_detail_cancellation);
+        pricingInfo = view.findViewById(R.id.ride_detail_pricing);
         passengersInfo = view.findViewById(R.id.ride_detail_passengers);
         reportsInfo = view.findViewById(R.id.ride_detail_reports);
         reviewsInfo = view.findViewById(R.id.ride_detail_reviews);
@@ -132,6 +134,7 @@ public class DriverRideDetailFragment extends Fragment {
                 ? "Vožnja je otkazana.\nOtkazao/la: " + safe(ride.getCanceledBy())
                     + "\nRazlog: " + safe(ride.getCancellationReason())
                 : "Vožnja nije otkazana.");
+        pricingInfo.setText(pricingText(ride));
         passengersInfo.setText(passengerText(ride));
         reportsInfo.setText(reportText(ride));
         reviewsInfo.setText(reviewText(ride));
@@ -183,6 +186,27 @@ public class DriverRideDetailFragment extends Fragment {
                     .append("\nTelefon: ").append(safe(passenger.getPhone()));
         }
         return text.toString();
+    }
+
+    private String pricingText(DriverRideHistoryItem ride) {
+        if (ride.getBasePriceAtBooking() <= 0 || ride.getPricePerKmAtBooking() <= 0) {
+            return "Za ovu stariju vožnju nisu sačuvani parametri cenovnika.\n"
+                    + String.format(Locale.getDefault(), "Ukupna cena: %.2f RSD",
+                    ride.getTotalPrice());
+        }
+        return "Tip vozila: " + vehicleType(ride.getVehicleTypeAtBooking())
+                + String.format(Locale.getDefault(),
+                "\nPočetna cena: %.2f RSD\nCena po kilometru: %.2f RSD/km"
+                        + "\nPređena udaljenost: %.2f km\nUkupna cena: %.2f RSD",
+                ride.getBasePriceAtBooking(), ride.getPricePerKmAtBooking(),
+                ride.getDistanceKm(), ride.getTotalPrice());
+    }
+
+    private static String vehicleType(String value) {
+        if ("LUXURY".equals(value)) return "Luksuzno";
+        if ("VAN".equals(value)) return "Kombi";
+        if ("STANDARD".equals(value)) return "Standardno";
+        return "—";
     }
 
     private String reportText(DriverRideHistoryItem ride) {

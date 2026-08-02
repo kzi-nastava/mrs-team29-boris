@@ -40,6 +40,10 @@ public class AdminDashboardFragment extends Fragment {
         userBlocking.setVisibility(View.VISIBLE);
         userBlocking.setOnClickListener(v ->
                 ((MainActivity) requireActivity()).navigateTo(R.id.nav_user_blocking));
+        View vehiclePrices = view.findViewById(R.id.admin_vehicle_prices);
+        vehiclePrices.setVisibility(View.VISIBLE);
+        vehiclePrices.setOnClickListener(v ->
+                ((MainActivity) requireActivity()).navigateTo(R.id.nav_vehicle_prices));
         View reports = view.findViewById(R.id.reports_button);
         reports.setVisibility(View.VISIBLE);
         reports.setOnClickListener(v ->

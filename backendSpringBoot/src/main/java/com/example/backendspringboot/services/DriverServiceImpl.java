@@ -105,6 +105,12 @@ public class DriverServiceImpl implements DriverService {
         dto.setStartTime(ride.getStartTime());
         dto.setEndTime(ride.getEndTime());
         dto.setTotalPrice(ride.getPrice());
+        dto.setVehicleTypeAtBooking(ride.getVehicleTypeAtBooking() == null
+                ? null : ride.getVehicleTypeAtBooking().name());
+        dto.setBasePriceAtBooking(ride.getBasePriceAtBooking());
+        dto.setPricePerKmAtBooking(ride.getPricePerKmAtBooking());
+        dto.setDistanceKm(ride.getDistanceKm() > 0 ? ride.getDistanceKm()
+                : ride.getRoute() == null ? 0 : ride.getRoute().getDistance());
         dto.setPanicPressed(ride.isPanicPressed());
 
         dto.setStatus(ride.getStatus() == null ? null : ride.getStatus().name());
@@ -149,6 +155,12 @@ public class DriverServiceImpl implements DriverService {
         dto.setStartTime(guestRide.getStartTime());
         dto.setEndTime(guestRide.getEndTime());
         dto.setTotalPrice(guestRide.getPrice());
+        dto.setVehicleTypeAtBooking(guestRide.getVehicleTypeAtBooking() == null
+                ? null : guestRide.getVehicleTypeAtBooking().name());
+        dto.setBasePriceAtBooking(guestRide.getBasePriceAtBooking());
+        dto.setPricePerKmAtBooking(guestRide.getPricePerKmAtBooking());
+        dto.setDistanceKm(guestRide.getDistanceKm() > 0 ? guestRide.getDistanceKm()
+                : guestRide.getRoute() == null ? 0 : guestRide.getRoute().getDistance());
         dto.setPanicPressed(guestRide.isPanicPressed());
         dto.setPassengers(Collections.emptyList());
         dto.setReviews(Collections.emptyList());

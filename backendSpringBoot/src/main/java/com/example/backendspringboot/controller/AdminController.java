@@ -108,6 +108,12 @@ public class AdminController {
         dto.setCanceled(ride.getCancelledBy() != null);
         dto.setCanceledBy(ride.getCancelledBy() != null ? ride.getCancelledBy().getEmail() : null);
         dto.setPrice(ride.getPrice());
+        dto.setVehicleTypeAtBooking(ride.getVehicleTypeAtBooking() == null
+                ? null : ride.getVehicleTypeAtBooking().name());
+        dto.setBasePriceAtBooking(ride.getBasePriceAtBooking());
+        dto.setPricePerKmAtBooking(ride.getPricePerKmAtBooking());
+        dto.setDistanceKm(ride.getDistanceKm() > 0 ? ride.getDistanceKm()
+                : ride.getRoute() == null ? 0 : ride.getRoute().getDistance());
         dto.setPanicTriggered(ride.isPanicPressed());
         dto.setStatus(ride.getStatus() != null ? ride.getStatus().toString() : null);
 

@@ -38,8 +38,35 @@ import com.example.mobilnaaplikacijatim29.data.model.ReportResponse;
 import com.example.mobilnaaplikacijatim29.data.model.AdminReportUser;
 import com.example.mobilnaaplikacijatim29.data.model.BlockableUser;
 import com.example.mobilnaaplikacijatim29.data.model.BlockNoteRequest;
+import com.example.mobilnaaplikacijatim29.data.model.SupportMessage;
+import com.example.mobilnaaplikacijatim29.data.model.SupportMessageRequest;
+import com.example.mobilnaaplikacijatim29.data.model.SupportConversation;
+import com.example.mobilnaaplikacijatim29.data.model.VehiclePriceConfig;
 
 public interface BackendApi {
+
+    @GET("api/chat/support/messages")
+    Call<List<SupportMessage>> getSupportMessages(
+            @Header("Authorization") String authorization,
+            @Query("userId") Long userId);
+
+    @POST("api/chat/support/messages")
+    Call<SupportMessage> sendSupportMessage(
+            @Header("Authorization") String authorization,
+            @Body SupportMessageRequest request);
+
+    @GET("api/chat/support/conversations")
+    Call<List<SupportConversation>> getSupportConversations(
+            @Header("Authorization") String authorization);
+
+    @GET("api/admin/prices")
+    Call<VehiclePriceConfig> getVehiclePrices(
+            @Header("Authorization") String authorization);
+
+    @PUT("api/admin/prices")
+    Call<VehiclePriceConfig> updateVehiclePrices(
+            @Header("Authorization") String authorization,
+            @Body VehiclePriceConfig prices);
 
     @GET("api/admin/drivers/all")
     Call<List<BlockableUser>> getAllDriversForBlocking(
