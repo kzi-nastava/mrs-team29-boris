@@ -9,11 +9,13 @@ import org.springframework.context.annotation.Bean;
 import jakarta.transaction.Transactional;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.scheduling.annotation.EnableScheduling;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
 @SpringBootApplication
+@EnableScheduling
 public class BackendSpringBootApplication {
 	public static void main(String[] args) {
 		SpringApplication.run(BackendSpringBootApplication.class, args);

@@ -44,37 +44,37 @@ public class RideServiceImpl implements RideService {
     private final EmailService emailService;
     private final VehiclePriceRepository vehiclePriceRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final AppNotificationService notificationService;
 
     //Other
     private static final double TRACKING_SIMULATION_SPEED = 10.0;
 
     // Ride creation
     @Override
+    @Transactional
     public RideResponseDTO createRide(CreateRideRequestDTO request) {
-        // Validation
-        if ((request.getOrigin().getLongitude().equals(request.getDestination().getLongitude())) &&
-                (request.getOrigin().getLatitude().equals(request.getDestination().getLatitude())) &&
-                (request.getOrigin().getAddress().equals(request.getDestination().getAddress()))) {
-            try {
-                throw new BadRequestException("Both origin and destination cannot be the same");
-            } catch (BadRequestException e) {
-                throw new RuntimeException(e);
-            }
+        if (request.getOrigin().getLongitude().equals(request.getDestination().getLongitude())
+                && request.getOrigin().getLatitude().equals(request.getDestination().getLatitude())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Polazište i odredište ne mogu biti ista tačka");
         }
 
         LocalDateTime now = LocalDateTime.now();
+        if (request.getScheduledTime() == null) request.setScheduledTime(now);
 
         if (request.getScheduledTime().isAfter(now.plusHours(5))) {
-            try {
-                throw new BadRequestException("You cannot schedule a ride more than five hours in advance");
-            } catch (BadRequestException e) {
-                throw new RuntimeException(e);
-            }
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Vožnja se može zakazati najviše pet sati unapred");
+        }
+        if (request.getScheduledTime().isBefore(now.minusMinutes(1))) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Vreme vožnje ne može biti u prošlosti");
         }
 
         // Find the passenger who created the ride
         Passenger creator = passengerRepository.findById(request.getPassengerId())
-                .orElseThrow(() -> new RuntimeException("Passenger not found with id: " + request.getPassengerId()));
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Putnik nije pronađen"));
 
         // Check if creator is maybe blocked
         if (creator.isBlocked()) {
@@ -109,7 +109,8 @@ public class RideServiceImpl implements RideService {
 
         // Find suitable driver for ride
         List<Driver> drivers = driverRepository.filterAvailableDrivers(DriverStatus.ACTIVE ,request.isBabyFriendly(), request.isPetFriendly(), request.getVehicleType());
-        Driver driver = findDriver(drivers, request.getScheduledTime(), request.getDurationMinutes());
+        Driver driver = findDriver(drivers, request.getScheduledTime(),
+                request.getDurationMinutes(), request.getOrigin());
 
         // Create ride
         Ride ride = new Ride();
@@ -132,6 +133,9 @@ public class RideServiceImpl implements RideService {
         if (driver == null) { // There is no available driver at the moment
             ride.setStatus(RideStatus.FAILED); // later send notification
             rideRepository.save(ride);
+            notificationService.notify(creator, ride, "RIDE_REJECTED",
+                    "Poručivanje vožnje nije uspelo: trenutno nema dostupnih vozača.",
+                    "ride:" + ride.getId() + ":rejected:" + creator.getId());
             // Map ride to response with status FAILED
             return new RideResponseDTO(
                     ride.getId(),
@@ -142,8 +146,17 @@ public class RideServiceImpl implements RideService {
         else { // An available driver was found
             ride.setStatus(RideStatus.SCHEDULED);
             ride.setDriver(driver);
+            if (driver.getScheduledRides() == null) driver.setScheduledRides(new ArrayList<>());
             driver.getScheduledRides().add(ride);
             rideRepository.save(ride);
+
+            notificationService.notify(driver, ride, "NEW_RIDE",
+                    "Dodeljena vam je nova vožnja od " + origin.getAddress()
+                            + " do " + destination.getAddress() + ".",
+                    "ride:" + ride.getId() + ":assigned-driver:" + driver.getId());
+            notificationService.notify(creator, ride, "RIDE_ACCEPTED",
+                    "Vožnja je prihvaćena i vozač je dodeljen.",
+                    "ride:" + ride.getId() + ":accepted:" + creator.getId());
 
             // Using websockets update drivers scheduled list
             messagingTemplate.convertAndSend(
@@ -152,7 +165,7 @@ public class RideServiceImpl implements RideService {
             );
 
             // Send notifications and emails to linked passengers for this ride
-            processNotifications(request.getPassengerEmails(), ride);
+            processNotifications(request.getPassengerEmails(), ride, creator);
 
             return new RideResponseDTO(
                     ride.getId(),
@@ -185,15 +198,17 @@ public class RideServiceImpl implements RideService {
         if (emails == null) return passengers;
 
         for (String email : emails) {
-            passengerRepository.findByEmail(email).ifPresent(p -> {
-                passengers.add(p);
+            passengerRepository.findByEmail(email.trim()).ifPresent(passenger -> {
+                boolean alreadyAdded = passengers.stream().anyMatch(existing ->
+                        existing.getId().equals(passenger.getId()));
+                if (!alreadyAdded) passengers.add(passenger);
             });
         }
         return passengers;
     }
 
     // Helper for sending notifications and emails to linked passengers
-    private void processNotifications(List<String> emails, Ride ride) {
+    private void processNotifications(List<String> emails, Ride ride, Passenger creator) {
         if (emails == null) return;
 
         for (String email : emails) {
@@ -202,9 +217,12 @@ public class RideServiceImpl implements RideService {
             if (passenger.isPresent()) {
                 // This passenger is registered
                 Passenger p = passenger.get();
-
-                // SEND NOTIFICATION
-                // ...
+                if (!p.getId().equals(creator.getId())) {
+                    notificationService.notify(p, ride, "LINKED_RIDE",
+                            creator.getName() + " " + creator.getSurname()
+                                    + " vas je povezao sa vožnjom.",
+                            "ride:" + ride.getId() + ":linked:" + p.getId());
+                }
             }
             else {
                 // This passenger is not registered
@@ -225,7 +243,8 @@ public class RideServiceImpl implements RideService {
     }
 
     // Find suitable driver
-    private Driver findDriver(List<Driver> drivers, LocalDateTime scheduledTime, int durationMinutes) {
+    private Driver findDriver(List<Driver> drivers, LocalDateTime scheduledTime,
+                              int durationMinutes, LocationDTO origin) {
         LocalDateTime requestStart = scheduledTime;
         LocalDateTime requestEnd = scheduledTime.plusMinutes(durationMinutes);
 
@@ -245,53 +264,63 @@ public class RideServiceImpl implements RideService {
             if (workMinutes > 480) {
                 continue; // Skip driver consideration
             }
-            boolean isBusy = false;
+            boolean activeConflict = false;
+            boolean finishingSoon = false;
 
             // Check currently active ride
             Ride active = d.getActiveRide();
             if (active != null) {
                 // When is currently active ride ending
-                LocalDateTime activeEnd = active.getScheduledTime().plusMinutes(active.getRoute().getDuration());
+                LocalDateTime activeStart = active.getStartTime() == null
+                        ? active.getScheduledTime() : active.getStartTime();
+                LocalDateTime activeEnd = activeStart.plusMinutes(active.getRoute().getDuration());
 
                 // Overlap
                 if (isOverlapping(requestStart, requestEnd, active.getScheduledTime(), activeEnd)) {
-                    isBusy = true;
+                    activeConflict = true;
 
                     // If driver is finishing within 10 minutes
                     if (isRideRequestedForNow(requestStart)) {
                         LocalDateTime now = LocalDateTime.now();
                         if (activeEnd.isAfter(now) && activeEnd.isBefore(now.plusMinutes(10))) {
                             // Busy but is finishing soon
-                            busyButFinishingCandidates.add(d);
+                            finishingSoon = true;
                         }
                     }
                 }
             }
             // Scheduled rides
-            if (!isBusy) {
-                for (Ride scheduled : d.getScheduledRides()) {
-                    LocalDateTime scheduledEnd = scheduled.getScheduledTime().plusMinutes(scheduled.getRoute().getDuration());
-
-                    if (isOverlapping(requestStart, requestEnd, scheduled.getScheduledTime(), scheduledEnd)) {
-                        isBusy = true;
-                        break; // Busy, no need for further checking
-                    }
+            boolean scheduledConflict = false;
+            for (Ride scheduled : safe(d.getScheduledRides())) {
+                LocalDateTime scheduledEnd = scheduled.getScheduledTime()
+                        .plusMinutes(scheduled.getRoute().getDuration());
+                if (isOverlapping(requestStart, requestEnd,
+                        scheduled.getScheduledTime(), scheduledEnd)) {
+                    scheduledConflict = true;
+                    break;
                 }
             }
-            // Completely available
-            if (!isBusy) {
+            if (scheduledConflict) continue;
+            if (!activeConflict) {
                 perfectCandidates.add(d);
+            } else if (finishingSoon) {
+                busyButFinishingCandidates.add(d);
             }
         }
 
         if (!perfectCandidates.isEmpty()) {
-            // Add location check later...
-            return perfectCandidates.get(0);
+            return perfectCandidates.stream()
+                    .min(Comparator.comparingDouble(driver ->
+                            distanceToOrigin(driver.getVehicle() == null
+                                    ? null : driver.getVehicle().getLocation(), origin)))
+                    .orElse(null);
         }
 
         if (!busyButFinishingCandidates.isEmpty()) {
-            // Add location check later...
-            return busyButFinishingCandidates.get(0);
+            return busyButFinishingCandidates.stream()
+                    .min(Comparator.comparingDouble(driver -> distanceToOrigin(
+                            driver.getActiveRide().getRoute().getDestination(), origin)))
+                    .orElse(null);
         }
         // No available drivers
         return null;
@@ -307,16 +336,44 @@ public class RideServiceImpl implements RideService {
     }
 
     private int calculateDriverWorkMinutes(Driver driver) {
-        LocalDateTime last24Hours = LocalDateTime.now().minusHours(24);
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime last24Hours = now.minusHours(24);
         int totalMinutes = 0;
 
-        for (Ride ride : driver.getFinishedRides()) {
-            if (ride.getEndTime() != null && ride.getEndTime().isAfter(last24Hours)) {
-                totalMinutes += ride.getRoute().getDuration();
-            }
+        for (Ride ride : rideRepository.findAllByDriverId(driver.getId())) {
+            totalMinutes += overlapMinutes(ride.getStartTime(), ride.getEndTime(),
+                    last24Hours, now);
         }
-        //...
+        for (GuestRide ride : guestRideRepository.findAllByDriverId(driver.getId())) {
+            totalMinutes += overlapMinutes(ride.getStartTime(), ride.getEndTime(),
+                    last24Hours, now);
+        }
         return totalMinutes;
+    }
+
+    private static int overlapMinutes(LocalDateTime start, LocalDateTime end,
+                                      LocalDateTime cutoff, LocalDateTime now) {
+        if (start == null) return 0;
+        LocalDateTime effectiveStart = start.isBefore(cutoff) ? cutoff : start;
+        LocalDateTime effectiveEnd = end == null || end.isAfter(now) ? now : end;
+        return effectiveEnd.isAfter(effectiveStart)
+                ? (int) Duration.between(effectiveStart, effectiveEnd).toMinutes() : 0;
+    }
+
+    private static double distanceToOrigin(Location location, LocationDTO origin) {
+        if (location == null) return Double.MAX_VALUE;
+        double lat1 = Math.toRadians(location.getLatitude());
+        double lat2 = Math.toRadians(origin.getLatitude());
+        double dLat = lat2 - lat1;
+        double dLon = Math.toRadians(origin.getLongitude() - location.getLongitude());
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(lat1) * Math.cos(lat2)
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return 6371.0 * 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1.0 - a));
+    }
+
+    private static <T> List<T> safe(List<T> values) {
+        return values == null ? Collections.emptyList() : values;
     }
 
     @Override

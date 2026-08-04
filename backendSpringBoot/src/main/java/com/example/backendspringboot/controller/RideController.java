@@ -45,8 +45,15 @@ public class RideController {
     private final SimpMessagingTemplate messagingTemplate;
 
     @PostMapping("/create-ride")
+    @PreAuthorize("hasRole('USER')")
     public ResponseEntity<RideResponseDTO> createRide(
-            @Valid @RequestBody CreateRideRequestDTO request) {
+            @Valid @RequestBody CreateRideRequestDTO request,
+            Authentication authentication) {
+
+        if (authentication == null || !(authentication.getPrincipal() instanceof Passenger passenger)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
+        request.setPassengerId(passenger.getId());
 
         RideResponseDTO response = rideService.createRide(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

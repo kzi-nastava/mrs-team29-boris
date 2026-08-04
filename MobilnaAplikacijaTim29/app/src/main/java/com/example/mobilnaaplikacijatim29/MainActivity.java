@@ -1,13 +1,19 @@
 package com.example.mobilnaaplikacijatim29;
 
 import android.content.Intent;
+import android.Manifest;
+import android.content.pm.PackageManager;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
@@ -33,13 +39,19 @@ import com.example.mobilnaaplikacijatim29.ui.admin.VehiclePricingFragment;
 import com.example.mobilnaaplikacijatim29.ui.report.ReportsFragment;
 import com.example.mobilnaaplikacijatim29.ui.support.SupportChatFragment;
 import com.example.mobilnaaplikacijatim29.ui.support.SupportConversationsFragment;
+import com.example.mobilnaaplikacijatim29.ui.notifications.NotificationsFragment;
+import com.example.mobilnaaplikacijatim29.notifications.SystemNotificationHelper;
+import com.example.mobilnaaplikacijatim29.data.model.AppNotification;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 
 import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
+import java.util.List;
+
 public class MainActivity extends AppCompatActivity {
+    public static final String EXTRA_OPEN_NOTIFICATIONS = "open_notifications";
 
     public interface LogoutCallback {
         void onFailure(String message);
@@ -47,6 +59,9 @@ public class MainActivity extends AppCompatActivity {
 
     private BottomNavigationView bottomNavigation;
     private SessionManager sessionManager;
+    private final Handler notificationHandler = new Handler(Looper.getMainLooper());
+    private final Runnable notificationRefresh = this::pollNotifications;
+    private boolean notificationRequestInProgress;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -62,14 +77,22 @@ public class MainActivity extends AppCompatActivity {
                 && Intent.ACTION_MAIN.equals(getIntent().getAction())) {
             sessionManager.clear();
         }
+        SystemNotificationHelper.createChannel(this);
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU
+                && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                != PackageManager.PERMISSION_GRANTED) {
+            ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS}, 2201);
+        }
         bottomNavigation = findViewById(R.id.bottom_navigation);
         bottomNavigation.setOnItemSelectedListener(item -> {
             showDestination(item.getItemId(), null);
             return true;
         });
         configureNavigationForSession();
+        scheduleNotificationPoll(0);
 
-        if (savedInstanceState == null && !handleDeepLink(getIntent())) {
+        if (savedInstanceState == null && !handleAppIntent(getIntent())) {
             bottomNavigation.setSelectedItemId(R.id.nav_home);
         }
 
@@ -84,7 +107,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         setIntent(intent);
-        handleDeepLink(intent);
+        handleAppIntent(intent);
     }
 
     public void navigateTo(int destinationId) {
@@ -102,7 +125,9 @@ public class MainActivity extends AppCompatActivity {
 
     public void navigateAfterLogin() {
         configureNavigationForSession();
-        bottomNavigation.setSelectedItemId(R.id.nav_dashboard);
+        scheduleNotificationPoll(0);
+        bottomNavigation.setSelectedItemId("user".equalsIgnoreCase(sessionManager.getRole())
+                ? R.id.nav_home : R.id.nav_dashboard);
     }
 
     public void navigateToDriverRideDetail(long rideId, boolean guest) {
@@ -149,6 +174,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void finishLogout() {
+        notificationHandler.removeCallbacks(notificationRefresh);
         sessionManager.clear();
         configureNavigationForSession();
         Toast.makeText(this, "Uspešno ste se odjavili.", Toast.LENGTH_SHORT).show();
@@ -199,6 +225,8 @@ public class MainActivity extends AppCompatActivity {
                     ? new SupportConversationsFragment() : new SupportChatFragment();
         } else if (destinationId == R.id.nav_vehicle_prices) {
             fragment = new VehiclePricingFragment();
+        } else if (destinationId == R.id.nav_notifications) {
+            fragment = new NotificationsFragment();
         } else if (destinationId == R.id.nav_forgot_password) {
             fragment = new ForgotPasswordFragment();
         } else if (destinationId == R.id.nav_reset_password) {
@@ -213,6 +241,58 @@ public class MainActivity extends AppCompatActivity {
                 .beginTransaction()
                 .replace(R.id.fragment_container, fragment)
                 .commit();
+    }
+
+    private void pollNotifications() {
+        if (sessionManager == null || !sessionManager.isLoggedIn()
+                || notificationRequestInProgress) {
+            scheduleNotificationPoll(5000);
+            return;
+        }
+        notificationRequestInProgress = true;
+        ApiClient.getApi().getNotifications(sessionManager.getAuthorizationHeader())
+                .enqueue(new Callback<>() {
+                    @Override public void onResponse(@NonNull Call<List<AppNotification>> call,
+                                                     @NonNull Response<List<AppNotification>> response) {
+                        notificationRequestInProgress = false;
+                        if (response.isSuccessful() && response.body() != null) {
+                            deliverNewNotifications(response.body());
+                        }
+                        scheduleNotificationPoll(5000);
+                    }
+                    @Override public void onFailure(@NonNull Call<List<AppNotification>> call,
+                                                    @NonNull Throwable throwable) {
+                        notificationRequestInProgress = false;
+                        scheduleNotificationPoll(5000);
+                    }
+                });
+    }
+
+    private void deliverNewNotifications(List<AppNotification> values) {
+        String key = "last_notification_" + sessionManager.getUserId();
+        android.content.SharedPreferences preferences = getSharedPreferences(
+                "notification_delivery", MODE_PRIVATE);
+        long lastDelivered = preferences.getLong(key, 0L);
+        long newest = lastDelivered;
+        for (int i = values.size() - 1; i >= 0; i--) {
+            AppNotification value = values.get(i);
+            if (value.getId() != null && value.getId() > lastDelivered) {
+                SystemNotificationHelper.show(this, value);
+                newest = Math.max(newest, value.getId());
+            }
+        }
+        if (newest > lastDelivered) preferences.edit().putLong(key, newest).apply();
+    }
+
+    private void scheduleNotificationPoll(long delayMs) {
+        notificationHandler.removeCallbacks(notificationRefresh);
+        notificationHandler.postDelayed(notificationRefresh, delayMs);
+    }
+
+    @Override
+    protected void onDestroy() {
+        notificationHandler.removeCallbacks(notificationRefresh);
+        super.onDestroy();
     }
 
     private boolean handleDeepLink(Intent intent) {
@@ -230,5 +310,15 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
         return false;
+    }
+
+    private boolean handleAppIntent(Intent intent) {
+        if (intent != null && intent.getBooleanExtra(EXTRA_OPEN_NOTIFICATIONS, false)
+                && sessionManager.isLoggedIn()) {
+            intent.removeExtra(EXTRA_OPEN_NOTIFICATIONS);
+            showDestination(R.id.nav_notifications, null);
+            return true;
+        }
+        return handleDeepLink(intent);
     }
 }

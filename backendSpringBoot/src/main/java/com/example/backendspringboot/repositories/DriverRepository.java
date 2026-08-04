@@ -40,8 +40,8 @@ public interface DriverRepository extends JpaRepository<Driver, Long> {
         WHERE d.status = :status 
         AND d.isBlocked = false
         AND d.deactivateAfterRide = false
-        AND d.vehicle.isBabyFriendly = :baby_bool
-        AND d.vehicle.isPetFriendly = :pet_bool
+        AND (:baby_bool = false OR d.vehicle.isBabyFriendly = true)
+        AND (:pet_bool = false OR d.vehicle.isPetFriendly = true)
         AND d.vehicle.type = :vehicleType
     """)
     List<Driver> filterAvailableDrivers(@Param("status") DriverStatus status, @Param("baby_bool") boolean baby_bool, @Param("pet_bool") boolean pet_bool, @Param("vehicleType")VehicleType vehicleType);

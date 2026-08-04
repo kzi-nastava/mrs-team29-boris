@@ -19,9 +19,11 @@ import java.time.LocalDateTime;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
 
@@ -38,12 +40,14 @@ public class CreateRideServiceTest {
     @Mock
     private RouteRepository routeRepository;
     @Mock private RideRepository rideRepository;
+    @Mock private GuestRideRepository guestRideRepository;
     @Mock
     private EmailService emailService;
     @Mock
     private SimpMessagingTemplate messagingTemplate;
     @Mock
     private VehiclePriceRepository vehiclePriceRepository;
+    @Mock private AppNotificationService notificationService;
 
     @InjectMocks
     private RideServiceImpl rideService;
@@ -155,11 +159,40 @@ public class CreateRideServiceTest {
 
         when(passengerRepository.findById(1L)).thenReturn(Optional.of(passenger));
         when(driverRepository.filterAvailableDrivers(any(), anyBoolean(), anyBoolean(), any())).thenReturn(List.of(driver));
+        when(rideRepository.findAllByDriverId(driver.getId())).thenReturn(List.of());
+        when(guestRideRepository.findAllByDriverId(driver.getId())).thenReturn(List.of());
 
         RideResponseDTO response = rideService.createRide(validRequest);
 
         assertEquals(RideStatus.SCHEDULED, response.getStatus());
         assertEquals(750, response.getPrice());
+    }
+
+    @Test
+    void whenSeveralDriversAreFree_thenNearestDriverIsAssigned() {
+        Driver farDriver = driverAt(20L, 45.30, 19.95);
+        Driver nearDriver = driverAt(21L, 45.01, 19.01);
+
+        when(passengerRepository.findById(1L)).thenReturn(Optional.of(passenger));
+        when(driverRepository.filterAvailableDrivers(any(), anyBoolean(), anyBoolean(), any()))
+                .thenReturn(List.of(farDriver, nearDriver));
+        when(rideRepository.findAllByDriverId(any())).thenReturn(List.of());
+        when(guestRideRepository.findAllByDriverId(any())).thenReturn(List.of());
+        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> {
+            Ride ride = invocation.getArgument(0);
+            ride.setId(90L);
+            return ride;
+        });
+
+        RideResponseDTO response = rideService.createRide(validRequest);
+
+        assertEquals(RideStatus.SCHEDULED, response.getStatus());
+        assertSame(nearDriver, nearDriver.getScheduledRides().get(0).getDriver());
+        assertEquals(1, nearDriver.getScheduledRides().size());
+        assertEquals(0, farDriver.getScheduledRides().size());
+        verify(notificationService).notify(nearDriver, nearDriver.getScheduledRides().get(0),
+                "NEW_RIDE", "Dodeljena vam je nova vožnja od Ulica A do Ulica B.",
+                "ride:90:assigned-driver:21");
     }
 
     // Driver is blocked
@@ -181,6 +214,7 @@ public class CreateRideServiceTest {
     @Test
     void whenDriverExceedsWorkLimit_thenRideStatusIsFailed() {
         Ride finishedRide = new Ride();
+        finishedRide.setStartTime(LocalDateTime.now().minusHours(10));
         finishedRide.setEndTime(LocalDateTime.now().minusHours(1));
         Route route = new Route();
         route.setDuration(500);
@@ -194,9 +228,29 @@ public class CreateRideServiceTest {
 
         when(passengerRepository.findById(1L)).thenReturn(Optional.of(passenger));
         when(driverRepository.filterAvailableDrivers(any(), anyBoolean(), anyBoolean(), any())).thenReturn(List.of(driver));
+        when(rideRepository.findAllByDriverId(driver.getId())).thenReturn(List.of(finishedRide));
+        when(guestRideRepository.findAllByDriverId(driver.getId())).thenReturn(List.of());
 
         RideResponseDTO response = rideService.createRide(validRequest);
 
         assertEquals(RideStatus.FAILED, response.getStatus());
+    }
+
+    private Driver driverAt(long id, double latitude, double longitude) {
+        Location location = new Location();
+        location.setLatitude(latitude);
+        location.setLongitude(longitude);
+
+        Vehicle vehicle = new Vehicle();
+        vehicle.setLocation(location);
+
+        Driver driver = new Driver();
+        driver.setId(id);
+        driver.setBlocked(false);
+        driver.setStatus(DriverStatus.ACTIVE);
+        driver.setVehicle(vehicle);
+        driver.setScheduledRides(new ArrayList<>());
+        driver.setFinishedRides(new ArrayList<>());
+        return driver;
     }
 }

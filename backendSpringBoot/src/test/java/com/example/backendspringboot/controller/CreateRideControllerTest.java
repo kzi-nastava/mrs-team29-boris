@@ -5,6 +5,7 @@ import com.example.backendspringboot.dto.request.CreateRideRequestDTO;
 import com.example.backendspringboot.dto.response.RideResponseDTO;
 import com.example.backendspringboot.model.RideStatus;
 import com.example.backendspringboot.model.VehicleType;
+import com.example.backendspringboot.model.Passenger;
 import com.example.backendspringboot.repositories.*;
 import com.example.backendspringboot.services.interfaces.GuestRideService;
 import com.example.backendspringboot.services.interfaces.ReviewService;
@@ -22,6 +23,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import java.time.LocalDateTime;
 
 import static org.mockito.ArgumentMatchers.any;
@@ -55,6 +57,7 @@ public class CreateRideControllerTest {
     private SimpMessagingTemplate messagingTemplate;
 
     private CreateRideRequestDTO validRequest;
+    private UsernamePasswordAuthenticationToken authentication;
 
     @BeforeEach
     void setUp() {
@@ -78,6 +81,9 @@ public class CreateRideControllerTest {
         validRequest.setBabyFriendly(false);
         validRequest.setPetFriendly(false);
         validRequest.setVehicleType(VehicleType.STANDARD);
+        Passenger passenger = new Passenger();
+        passenger.setId(77L);
+        authentication = new UsernamePasswordAuthenticationToken(passenger, null);
     }
 
     @Test
@@ -86,6 +92,7 @@ public class CreateRideControllerTest {
         when(rideService.createRide(any())).thenReturn(response);
 
         mockMvc.perform(post("/api/rides/create-ride")
+                        .principal(authentication)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                         .andDo(print())
@@ -99,6 +106,7 @@ public class CreateRideControllerTest {
         when(rideService.createRide(any())).thenReturn(response);
 
         mockMvc.perform(post("/api/rides/create-ride")
+                        .principal(authentication)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                         .andDo(print())
@@ -112,6 +120,7 @@ public class CreateRideControllerTest {
                 .thenThrow(new ResponseStatusException(HttpStatus.BAD_REQUEST, "Passenger is blocked"));
 
         mockMvc.perform(post("/api/rides/create-ride")
+                        .principal(authentication)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(validRequest)))
                         .andDo(print())

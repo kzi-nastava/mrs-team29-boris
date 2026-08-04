@@ -75,6 +75,7 @@ public class Ride {
     private boolean isPetFriendly;
 
     @ManyToMany
+    @OrderColumn(name = "stop_order")
     private List<Location> stops;
 
     @OneToMany(mappedBy = "ride", cascade = CascadeType.ALL, orphanRemoval = true)

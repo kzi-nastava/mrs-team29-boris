@@ -52,6 +52,8 @@ public class DriverDashboardFragment extends Fragment {
         view.findViewById(R.id.reports_button).setVisibility(View.VISIBLE);
         view.findViewById(R.id.reports_button).setOnClickListener(v ->
                 ((MainActivity) requireActivity()).navigateTo(R.id.nav_reports));
+        view.findViewById(R.id.notifications_button).setOnClickListener(v ->
+                ((MainActivity) requireActivity()).navigateTo(R.id.nav_notifications));
         setActiveButton.setOnClickListener(v -> changeStatus("ACTIVE"));
         setInactiveButton.setOnClickListener(v -> changeStatus("INACTIVE"));
         view.findViewById(R.id.dashboard_logout).setOnClickListener(v ->

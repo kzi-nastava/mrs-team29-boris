@@ -1,13 +1,11 @@
 package com.example.backendspringboot.services;
 
-import com.example.backendspringboot.dto.NotificationDTO;
 import com.example.backendspringboot.model.Passenger;
 import com.example.backendspringboot.model.Ride;
 import com.example.backendspringboot.model.RideStatus;
 import com.example.backendspringboot.repositories.RideRepository;
-import jakarta.transaction.Transactional;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
+import lombok.RequiredArgsConstructor;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
@@ -16,15 +14,13 @@ import java.time.temporal.ChronoUnit;
 import java.util.List;
 
 @Component
+@RequiredArgsConstructor
 public class RideNotificationScheduler {
-    @Autowired
-    private RideRepository rideRepository;
-
-    @Autowired
-    private SimpMessagingTemplate messagingTemplate;
+    private final RideRepository rideRepository;
+    private final AppNotificationService notificationService;
 
     // (60000ms)
-    @Scheduled(fixedRate = 60000)
+    @Scheduled(fixedRate = 30000)
     @Transactional
     public void checkUpcomingRides() {
         LocalDateTime now = LocalDateTime.now();
@@ -35,36 +31,29 @@ public class RideNotificationScheduler {
         //System.out.println("Found scheduled rides: " + rides.size());
 
         for (Ride ride : rides) {
-            long minutesUntilRide = ChronoUnit.MINUTES.between(now, ride.getScheduledTime());
-
-            // 15 minutes before start time
-            if (minutesUntilRide >= 14 && minutesUntilRide <= 16) {
-                //System.out.println("Detected notification time");
-                sendNotification(ride, "Your ride begins in 15 minutes.");
-            }
-
-            // Send notification every 5 minutes
-            if (minutesUntilRide < 15 && minutesUntilRide > 0 && minutesUntilRide % 5 == 0) {
-                //System.out.println("Detected notification time");
-                sendNotification(ride, "Reminder: Your ride begins in " + minutesUntilRide + " minutes.");
+            long seconds = ChronoUnit.SECONDS.between(now, ride.getScheduledTime());
+            long minutesUntilRide = (long) Math.ceil(seconds / 60.0);
+            if (minutesUntilRide == 15 || minutesUntilRide == 10 || minutesUntilRide == 5) {
+                sendNotification(ride, minutesUntilRide);
             }
         }
     }
 
-    private void sendNotification(Ride ride, String message) {
-        // Send message to passenger
-        // /topic/passenger/{id}/notes
-        NotificationDTO notification = new NotificationDTO(message, ride.getId());
-
-        // Send notification to ride creator
-        Long creatorId = ride.getRideCreator().getId();
-        messagingTemplate.convertAndSend("/topic/passenger/" + creatorId + "/notes", notification);
-        //System.out.println("Notification sent to: " + creatorId);
-
-        // Send notification to other passenger, if there are any linked to ride
+    private void sendNotification(Ride ride, long minutes) {
+        String content = "Podsetnik: zakazana vožnja počinje za " + minutes + " minuta.";
+        Passenger creator = ride.getRideCreator();
+        notificationService.notify(creator, ride, "RIDE_REMINDER", content,
+                reminderKey(ride, creator, minutes));
+        if (ride.getPassengers() == null) return;
         for (Passenger p : ride.getPassengers()) {
-            messagingTemplate.convertAndSend("/topic/passenger/" + p.getId() + "/notes", notification);
-            //System.out.println("Notification sent to passenger: " + p.getId());
+            if (!p.getId().equals(creator.getId())) {
+                notificationService.notify(p, ride, "RIDE_REMINDER", content,
+                        reminderKey(ride, p, minutes));
+            }
         }
+    }
+
+    private String reminderKey(Ride ride, Passenger passenger, long minutes) {
+        return "ride:" + ride.getId() + ":reminder:" + minutes + ":" + passenger.getId();
     }
 }

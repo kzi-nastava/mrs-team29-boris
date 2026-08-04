@@ -101,6 +101,16 @@ public class DriverRepositoryTest {
     }
 
     @Test
+    public void whenSpecialEquipmentIsNotRequested_thenEquippedDriverStillMatches() {
+        createDriver(DriverStatus.ACTIVE, true, true, VehicleType.STANDARD);
+
+        List<Driver> result = driverRepository.filterAvailableDrivers(
+                DriverStatus.ACTIVE, false, false, VehicleType.STANDARD);
+
+        assertEquals(1, result.size());
+    }
+
+    @Test
     public void whenVehicleTypeDoesNotMatch_thenReturnEmpty() {
         createDriver(DriverStatus.ACTIVE, true, true, VehicleType.VAN);
 

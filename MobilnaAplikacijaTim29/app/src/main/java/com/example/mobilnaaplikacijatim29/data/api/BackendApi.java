@@ -42,8 +42,28 @@ import com.example.mobilnaaplikacijatim29.data.model.SupportMessage;
 import com.example.mobilnaaplikacijatim29.data.model.SupportMessageRequest;
 import com.example.mobilnaaplikacijatim29.data.model.SupportConversation;
 import com.example.mobilnaaplikacijatim29.data.model.VehiclePriceConfig;
+import com.example.mobilnaaplikacijatim29.data.model.CreateRideRequest;
+import com.example.mobilnaaplikacijatim29.data.model.RideBookingResponse;
+import com.example.mobilnaaplikacijatim29.data.model.AppNotification;
 
 public interface BackendApi {
+
+    @GET("api/notifications")
+    Call<List<AppNotification>> getNotifications(
+            @Header("Authorization") String authorization);
+
+    @POST("api/notifications/seen")
+    Call<Void> markNotificationsSeen(
+            @Header("Authorization") String authorization);
+
+    @GET("api/vehicles/prices")
+    Call<VehiclePriceConfig> getBookingPrices(
+            @Header("Authorization") String authorization);
+
+    @POST("api/rides/create-ride")
+    Call<RideBookingResponse> createRide(
+            @Header("Authorization") String authorization,
+            @Body CreateRideRequest request);
 
     @GET("api/chat/support/messages")
     Call<List<SupportMessage>> getSupportMessages(
