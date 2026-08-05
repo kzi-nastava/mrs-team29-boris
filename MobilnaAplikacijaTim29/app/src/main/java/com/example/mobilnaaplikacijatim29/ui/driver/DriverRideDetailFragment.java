@@ -30,7 +30,9 @@ import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.Marker;
 import org.osmdroid.views.overlay.Polyline;
 
+import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 
 import retrofit2.Call;
@@ -138,10 +140,11 @@ public class DriverRideDetailFragment extends Fragment {
         passengersInfo.setText(passengerText(ride));
         reportsInfo.setText(reportText(ride));
         reviewsInfo.setText(reviewText(ride));
-        showRoute(ride.getOrigin(), ride.getDestination());
+        showRoute(ride.getOrigin(), ride.getDestination(), ride.getRouteGeometry());
     }
 
-    private void showRoute(RideHistoryLocation origin, RideHistoryLocation destination) {
+    private void showRoute(RideHistoryLocation origin, RideHistoryLocation destination,
+                           List<RideHistoryLocation> geometry) {
         map.getOverlays().clear();
         GeoPoint from = point(origin);
         GeoPoint to = point(destination);
@@ -151,17 +154,24 @@ public class DriverRideDetailFragment extends Fragment {
         }
         Marker originMarker = marker(from, "Polazište", address(origin));
         Marker destinationMarker = marker(to, "Odredište", address(destination));
+        List<GeoPoint> routePoints = new ArrayList<>();
+        for (RideHistoryLocation routePoint : geometry) {
+            GeoPoint point = point(routePoint);
+            if (point != null) routePoints.add(point);
+        }
+        if (routePoints.size() < 2) routePoints = Arrays.asList(from, to);
         Polyline route = new Polyline();
-        route.setPoints(Arrays.asList(from, to));
+        route.setPoints(routePoints);
         route.setColor(Color.rgb(25, 118, 210));
         route.setWidth(8f);
-        route.setTitle("Sačuvani pravac (polazište–odredište)");
+        route.setTitle("Sačuvana drumska ruta");
         map.getOverlays().add(route);
         map.getOverlays().add(originMarker);
         map.getOverlays().add(destinationMarker);
+        List<GeoPoint> bounds = routePoints;
         map.post(() -> {
             if (map != null) map.zoomToBoundingBox(
-                    BoundingBox.fromGeoPoints(Arrays.asList(from, to)), true, 90);
+                    BoundingBox.fromGeoPoints(bounds), true, 90);
         });
         map.invalidate();
     }

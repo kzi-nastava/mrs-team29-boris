@@ -19,6 +19,7 @@ public class DriverRideHistoryResponseDTO {
     private LocalDateTime endTime;
     private LocationDTO origin;
     private LocationDTO destination;
+    private List<LocationDTO> routeGeometry;
     private double totalPrice;
     private String vehicleTypeAtBooking;
     private double basePriceAtBooking;

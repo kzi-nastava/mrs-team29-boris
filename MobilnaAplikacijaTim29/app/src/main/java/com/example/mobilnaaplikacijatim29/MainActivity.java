@@ -31,7 +31,6 @@ import com.example.mobilnaaplikacijatim29.ui.driver.DriverDashboardFragment;
 import com.example.mobilnaaplikacijatim29.ui.driver.DriverRideDetailFragment;
 import com.example.mobilnaaplikacijatim29.ui.driver.DriverRideHistoryFragment;
 import com.example.mobilnaaplikacijatim29.ui.home.HomeFragment;
-import com.example.mobilnaaplikacijatim29.ui.passenger.PassengerDashboardFragment;
 import com.example.mobilnaaplikacijatim29.ui.profile.ProfileFragment;
 import com.example.mobilnaaplikacijatim29.ui.admin.ProfileChangeRequestsFragment;
 import com.example.mobilnaaplikacijatim29.ui.admin.UserBlockingFragment;
@@ -86,6 +85,11 @@ public class MainActivity extends AppCompatActivity {
         }
         bottomNavigation = findViewById(R.id.bottom_navigation);
         bottomNavigation.setOnItemSelectedListener(item -> {
+            if (item.getItemId() == R.id.nav_login && sessionManager.isLoggedIn()) {
+                requestLogout(message ->
+                        Toast.makeText(this, message, Toast.LENGTH_LONG).show());
+                return false;
+            }
             showDestination(item.getItemId(), null);
             return true;
         });
@@ -93,7 +97,12 @@ public class MainActivity extends AppCompatActivity {
         scheduleNotificationPoll(0);
 
         if (savedInstanceState == null && !handleAppIntent(getIntent())) {
-            bottomNavigation.setSelectedItemId(R.id.nav_home);
+            if (sessionManager.isLoggedIn()) {
+                bottomNavigation.setSelectedItemId(R.id.nav_dashboard);
+            } else {
+                clearNavigationSelection();
+                showDestination(0, null);
+            }
         }
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
@@ -126,8 +135,7 @@ public class MainActivity extends AppCompatActivity {
     public void navigateAfterLogin() {
         configureNavigationForSession();
         scheduleNotificationPoll(0);
-        bottomNavigation.setSelectedItemId("user".equalsIgnoreCase(sessionManager.getRole())
-                ? R.id.nav_home : R.id.nav_dashboard);
+        bottomNavigation.setSelectedItemId(R.id.nav_dashboard);
     }
 
     public void navigateToDriverRideDetail(long rideId, boolean guest) {
@@ -178,21 +186,34 @@ public class MainActivity extends AppCompatActivity {
         sessionManager.clear();
         configureNavigationForSession();
         Toast.makeText(this, "Uspešno ste se odjavili.", Toast.LENGTH_SHORT).show();
-        bottomNavigation.setSelectedItemId(R.id.nav_home);
+        clearNavigationSelection();
+        showDestination(0, null);
     }
 
     private void configureNavigationForSession() {
         boolean loggedIn = sessionManager.isLoggedIn();
-        bottomNavigation.getMenu().findItem(R.id.nav_login).setVisible(!loggedIn);
         bottomNavigation.getMenu().findItem(R.id.nav_dashboard).setVisible(loggedIn);
         bottomNavigation.getMenu().findItem(R.id.nav_profile).setVisible(loggedIn);
         bottomNavigation.getMenu().findItem(R.id.nav_support).setVisible(loggedIn);
+        bottomNavigation.getMenu().findItem(R.id.nav_notifications).setVisible(loggedIn);
+        bottomNavigation.getMenu().findItem(R.id.nav_login)
+                .setTitle(loggedIn ? "Odjava" : "Prijava")
+                .setIcon(loggedIn ? android.R.drawable.ic_menu_close_clear_cancel
+                        : android.R.drawable.ic_lock_lock);
         if (loggedIn) {
             String role = sessionManager.getRole();
-            String title = "user".equalsIgnoreCase(role) ? "Putnik"
+            String title = "user".equalsIgnoreCase(role) ? "Početna"
                     : "driver".equalsIgnoreCase(role) ? "Vozač" : "Admin";
             bottomNavigation.getMenu().findItem(R.id.nav_dashboard).setTitle(title);
         }
+    }
+
+    private void clearNavigationSelection() {
+        bottomNavigation.getMenu().setGroupCheckable(0, true, false);
+        for (int i = 0; i < bottomNavigation.getMenu().size(); i++) {
+            bottomNavigation.getMenu().getItem(i).setChecked(false);
+        }
+        bottomNavigation.getMenu().setGroupCheckable(0, true, true);
     }
 
     private void showDestination(int destinationId, String token) {
@@ -206,7 +227,7 @@ public class MainActivity extends AppCompatActivity {
             } else if ("driver".equalsIgnoreCase(role)) {
                 fragment = new DriverDashboardFragment();
             } else {
-                fragment = new PassengerDashboardFragment();
+                fragment = new HomeFragment();
             }
         } else if (destinationId == R.id.nav_driver_registration) {
             fragment = new DriverRegistrationFragment();
@@ -234,7 +255,11 @@ public class MainActivity extends AppCompatActivity {
         } else if (destinationId == R.id.nav_complete_driver_registration) {
             fragment = CompleteDriverRegistrationFragment.newInstance(token);
         } else {
-            fragment = new HomeFragment();
+            String role = sessionManager.getRole();
+            fragment = !sessionManager.isLoggedIn() ? new HomeFragment()
+                    : "admin".equalsIgnoreCase(role) ? new AdminDashboardFragment()
+                    : "driver".equalsIgnoreCase(role) ? new DriverDashboardFragment()
+                    : new HomeFragment();
         }
 
         getSupportFragmentManager()

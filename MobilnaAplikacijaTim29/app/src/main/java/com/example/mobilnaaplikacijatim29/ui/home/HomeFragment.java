@@ -15,7 +15,6 @@ import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.Spinner;
 import android.widget.TextView;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -31,6 +30,8 @@ import com.example.mobilnaaplikacijatim29.data.model.BookingLocation;
 import com.example.mobilnaaplikacijatim29.data.model.CreateRideRequest;
 import com.example.mobilnaaplikacijatim29.data.model.LocationResponse;
 import com.example.mobilnaaplikacijatim29.data.model.RideBookingResponse;
+import com.example.mobilnaaplikacijatim29.data.model.RoutePreviewRequest;
+import com.example.mobilnaaplikacijatim29.data.model.RoutePreviewResponse;
 import com.example.mobilnaaplikacijatim29.data.model.VehiclePriceConfig;
 import com.example.mobilnaaplikacijatim29.data.session.SessionManager;
 import com.example.mobilnaaplikacijatim29.domain.RideBookingCalculator;
@@ -93,12 +94,18 @@ public class HomeFragment extends Fragment {
     private final List<BookingLocation> stops = new ArrayList<>();
     private final List<Marker> vehicleMarkers = new ArrayList<>();
     private final List<Marker> bookingMarkers = new ArrayList<>();
+    private final List<GeoPoint> roadGeometry = new ArrayList<>();
     private Polyline bookingLine;
+    private Double roadDistanceKm;
+    private Integer roadDurationMinutes;
+    private boolean routePreviewReady;
+    private int routeRevision;
     private SelectionMode selectionMode = SelectionMode.NONE;
     private LocalDateTime selectedTime;
     private final Handler refreshHandler = new Handler(Looper.getMainLooper());
     private boolean vehicleRequestInProgress;
     private boolean mapViewportInitialized;
+    private boolean showVehicleList;
     private final Runnable vehicleRefresh = this::loadActiveVehicles;
 
     @Nullable
@@ -132,25 +139,16 @@ public class HomeFragment extends Fragment {
         session = new SessionManager(requireContext());
         TextView sessionStatus = view.findViewById(R.id.session_status);
         vehiclesStatus = view.findViewById(R.id.vehicles_status);
-        View loginButton = view.findViewById(R.id.login_button);
-        View logoutButton = view.findViewById(R.id.logout_button);
-
-        if (session.isLoggedIn()) {
-            sessionStatus.setText("Prijavljen korisnik: " + session.getEmail()
-                    + " (" + session.getRole() + ")");
-            loginButton.setVisibility(View.GONE);
-            logoutButton.setVisibility(View.VISIBLE);
-        } else {
-            sessionStatus.setText("Niste prijavljeni.");
-            logoutButton.setVisibility(View.GONE);
-        }
-        loginButton.setOnClickListener(v ->
-                ((MainActivity) requireActivity()).navigateTo(R.id.nav_login));
-        logoutButton.setOnClickListener(v ->
-                ((MainActivity) requireActivity()).requestLogout(message ->
-                        Toast.makeText(requireContext(), message, Toast.LENGTH_LONG).show()));
 
         boolean passenger = session.isLoggedIn() && "user".equalsIgnoreCase(session.getRole());
+        showVehicleList = !passenger;
+        view.findViewById(R.id.home_intro_title)
+                .setVisibility(passenger ? View.GONE : View.VISIBLE);
+        view.findViewById(R.id.home_intro_subtitle)
+                .setVisibility(passenger ? View.GONE : View.VISIBLE);
+        sessionStatus.setVisibility(passenger ? View.GONE : View.VISIBLE);
+        vehiclesStatus.setVisibility(showVehicleList ? View.VISIBLE : View.GONE);
+        if (!passenger) sessionStatus.setText("Niste prijavljeni.");
         view.findViewById(R.id.ride_booking_section)
                 .setVisibility(passenger ? View.VISIBLE : View.GONE);
         if (passenger) setupBooking(view);
@@ -167,6 +165,8 @@ public class HomeFragment extends Fragment {
         scheduleSwitch = view.findViewById(R.id.booking_schedule_later);
         pickTimeButton = view.findViewById(R.id.booking_pick_time);
         submitButton = view.findViewById(R.id.booking_submit);
+        view.findViewById(R.id.passenger_reports_button).setOnClickListener(v ->
+                ((MainActivity) requireActivity()).navigateTo(R.id.nav_reports));
         vehicleType.setAdapter(new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_dropdown_item,
                 new String[]{"Standardno", "Luksuzno", "Kombi"}));
@@ -191,6 +191,7 @@ public class HomeFragment extends Fragment {
         });
         pickTimeButton.setOnClickListener(v -> pickDateTime());
         submitButton.setOnClickListener(v -> submitRide());
+        submitButton.setEnabled(false);
         vehicleType.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
             @Override public void onItemSelected(android.widget.AdapterView<?> parent, View view,
                                                   int position, long id) { updateEstimate(); }
@@ -227,30 +228,44 @@ public class HomeFragment extends Fragment {
         else destination = location;
         selectionMode = SelectionMode.NONE;
         bookingInstruction.setText("Tačka je dodata. Izaberi sledeći korak.");
-        renderBookingRoute();
+        bookingPointsChanged();
         return true;
+    }
+
+    private void bookingPointsChanged() {
+        routeRevision++;
+        roadGeometry.clear();
+        roadDistanceKm = null;
+        roadDurationMinutes = null;
+        routePreviewReady = false;
+        if (submitButton != null) submitButton.setEnabled(false);
+        renderBookingRoute();
+        if (origin != null && destination != null) loadRoadRoute(routeRevision);
     }
 
     private void renderBookingRoute() {
         mapView.getOverlays().removeAll(bookingMarkers);
         bookingMarkers.clear();
         if (bookingLine != null) mapView.getOverlays().remove(bookingLine);
-        List<GeoPoint> points = bookingPoints();
-        for (int i = 0; i < points.size(); i++) {
+        List<GeoPoint> waypointPoints = bookingPoints();
+        for (int i = 0; i < waypointPoints.size(); i++) {
             Marker marker = new Marker(mapView);
-            marker.setPosition(points.get(i));
+            marker.setPosition(waypointPoints.get(i));
             marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
             marker.setTitle(i == 0 ? "Polazište"
-                    : destination != null && i == points.size() - 1 ? "Odredište"
+                    : destination != null && i == waypointPoints.size() - 1 ? "Odredište"
                     : "Stanica " + i);
             bookingMarkers.add(marker);
             mapView.getOverlays().add(marker);
         }
-        if (points.size() > 1) {
+        List<GeoPoint> displayedRoute = roadGeometry.isEmpty() ? waypointPoints : roadGeometry;
+        if (displayedRoute.size() > 1) {
             bookingLine = new Polyline();
-            bookingLine.setPoints(points);
+            bookingLine.setPoints(displayedRoute);
             bookingLine.setColor(Color.rgb(25, 118, 210));
             bookingLine.setWidth(8f);
+            bookingLine.setTitle(roadGeometry.isEmpty()
+                    ? "Izabrane tačke" : "Drumska ruta");
             mapView.getOverlays().add(bookingLine);
         }
         routeSummary.setText("Polazište: " + (origin == null ? "nije izabrano" : origin.getAddress())
@@ -273,16 +288,21 @@ public class HomeFragment extends Fragment {
         destination = null;
         stops.clear();
         selectionMode = SelectionMode.NONE;
-        renderBookingRoute();
+        bookingPointsChanged();
         bookingInstruction.setText("Ruta je obrisana. Izaberi polazište i dodirni mapu.");
     }
 
     private void updateEstimate() {
         if (estimate == null || origin == null || destination == null) return;
-        double distance = routeDistanceKm();
+        if (!routePreviewReady || roadDistanceKm == null || roadDurationMinutes == null) {
+            estimate.setText("Računanje precizne drumske rute...");
+            return;
+        }
+        double distance = roadDistanceKm;
         if (prices == null) {
             estimate.setText(String.format(Locale.getDefault(),
-                    "Približna dužina: %.2f km", distance));
+                    "Drumska udaljenost: %.2f km\nProcenjeno trajanje: %d min",
+                    distance, roadDurationMinutes));
             return;
         }
         double base = vehicleType.getSelectedItemPosition() == 1 ? prices.getLuxuryBasePrice()
@@ -291,8 +311,9 @@ public class HomeFragment extends Fragment {
         double price = Math.round(RideBookingCalculator.price(
                 base, prices.getPricePerKm(), distance));
         estimate.setText(String.format(Locale.getDefault(),
-                "Približna dužina: %.2f km\nCena: %.0f + %.2f × %.0f = %.0f RSD",
-                distance, base, distance, prices.getPricePerKm(), price));
+                "Drumska udaljenost: %.2f km\nProcenjeno trajanje: %d min"
+                        + "\nCena: %.0f + %.2f × %.0f = %.0f RSD",
+                distance, roadDurationMinutes, base, distance, prices.getPricePerKm(), price));
     }
 
     private void pickDateTime() {
@@ -312,6 +333,10 @@ public class HomeFragment extends Fragment {
             showBookingMessage("Izaberi polazište i odredište na mapi.", true);
             return;
         }
+        if (!routePreviewReady || roadDistanceKm == null || roadDurationMinutes == null) {
+            showBookingMessage("Sačekaj da se izračuna precizna drumska ruta.", true);
+            return;
+        }
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime scheduled = scheduleSwitch.isChecked() ? selectedTime : now.plusSeconds(30);
         if (scheduled == null) {
@@ -324,8 +349,8 @@ public class HomeFragment extends Fragment {
         }
         List<String> emails = passengerEmails();
         if (emails == null) return;
-        double distance = routeDistanceKm();
-        int duration = RideBookingCalculator.approximateDurationMinutes(distance);
+        double distance = roadDistanceKm;
+        int duration = roadDurationMinutes;
         String[] types = {"STANDARD", "LUXURY", "VAN"};
         CreateRideRequest request = new CreateRideRequest(origin, destination,
                 new ArrayList<>(stops), emails, types[vehicleType.getSelectedItemPosition()],
@@ -399,8 +424,41 @@ public class HomeFragment extends Fragment {
         bookingMessage.setVisibility(value.isEmpty() ? View.GONE : View.VISIBLE);
     }
 
-    private double routeDistanceKm() {
-        return RideBookingCalculator.routeDistanceKm(origin, stops, destination);
+    private void loadRoadRoute(int revision) {
+        showBookingMessage("Računanje drumske rute...", false);
+        ApiClient.getApi().previewRoute(session.getAuthorizationHeader(),
+                        new RoutePreviewRequest(origin, new ArrayList<>(stops), destination))
+                .enqueue(new Callback<>() {
+                    @Override public void onResponse(@NonNull Call<RoutePreviewResponse> call,
+                                                     @NonNull Response<RoutePreviewResponse> response) {
+                        if (!isAdded() || revision != routeRevision) return;
+                        if (!response.isSuccessful() || response.body() == null
+                                || response.body().getGeometry() == null
+                                || response.body().getGeometry().size() < 2) {
+                            showBookingMessage(errorMessage(response), true);
+                            updateEstimate();
+                            return;
+                        }
+                        roadGeometry.clear();
+                        for (BookingLocation point : response.body().getGeometry()) {
+                            roadGeometry.add(new GeoPoint(point.getLatitude(), point.getLongitude()));
+                        }
+                        roadDistanceKm = response.body().getDistanceKm();
+                        roadDurationMinutes = response.body().getDurationMinutes();
+                        routePreviewReady = true;
+                        submitButton.setEnabled(true);
+                        showBookingMessage("Precizna drumska ruta je izračunata.", false);
+                        renderBookingRoute();
+                    }
+
+                    @Override public void onFailure(@NonNull Call<RoutePreviewResponse> call,
+                                                    @NonNull Throwable throwable) {
+                        if (!isAdded() || revision != routeRevision) return;
+                        showBookingMessage("Routing servis nije dostupan: "
+                                + throwable.getMessage(), true);
+                        updateEstimate();
+                    }
+                });
     }
 
     private GeoPoint point(BookingLocation location) {
@@ -416,13 +474,16 @@ public class HomeFragment extends Fragment {
                 vehicleRequestInProgress = false;
                 if (vehiclesStatus == null || mapView == null) return;
                 if (!response.isSuccessful() || response.body() == null) {
-                    vehiclesStatus.setText("Backend je odgovorio greškom: HTTP " + response.code());
+                    if (showVehicleList) vehiclesStatus.setText(
+                            "Backend je odgovorio greškom: HTTP " + response.code());
                     scheduleVehicleRefresh();
                     return;
                 }
                 List<ActiveVehicleResponse> vehicles = response.body();
                 showVehiclesOnMap(vehicles);
-                if (vehicles.isEmpty()) {
+                if (!showVehicleList) {
+                    // The passenger home keeps the live map without duplicating a textual list.
+                } else if (vehicles.isEmpty()) {
                     vehiclesStatus.setText("Backend je povezan. Trenutno nema aktivnih vozila.");
                 } else {
                     StringBuilder text = new StringBuilder("Aktivna vozila: ")
@@ -443,7 +504,7 @@ public class HomeFragment extends Fragment {
             @Override public void onFailure(@NonNull Call<List<ActiveVehicleResponse>> call,
                                             @NonNull Throwable throwable) {
                 vehicleRequestInProgress = false;
-                if (vehiclesStatus != null) vehiclesStatus.setText(
+                if (vehiclesStatus != null && showVehicleList) vehiclesStatus.setText(
                         "Povezivanje sa backendom nije uspelo:\n" + throwable.getMessage());
                 scheduleVehicleRefresh();
             }
@@ -490,7 +551,7 @@ public class HomeFragment extends Fragment {
 
     private Drawable createVehicleIcon(boolean busy) {
         Drawable drawable = ContextCompat.getDrawable(requireContext(),
-                android.R.drawable.ic_menu_mylocation);
+                R.drawable.ic_car_marker);
         if (drawable == null) return null;
         Drawable icon = DrawableCompat.wrap(drawable).mutate();
         DrawableCompat.setTint(icon, busy ? Color.rgb(198, 40, 40) : Color.rgb(46, 125, 50));

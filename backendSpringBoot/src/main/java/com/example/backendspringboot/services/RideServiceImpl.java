@@ -24,6 +24,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Function;
 
 @Service
 @RequiredArgsConstructor
@@ -45,6 +46,8 @@ public class RideServiceImpl implements RideService {
     private final VehiclePriceRepository vehiclePriceRepository;
     private final SimpMessagingTemplate messagingTemplate;
     private final AppNotificationService notificationService;
+    private final RoutingService routingService;
+    private final IdleVehiclePositionService idleVehiclePositionService;
 
     //Other
     private static final double TRACKING_SIMULATION_SPEED = 10.0;
@@ -85,6 +88,11 @@ public class RideServiceImpl implements RideService {
                     "Nalog je blokiran. Razlog: " + reason);
         }
 
+        // The backend calculates the authoritative road route. Distance, duration
+        // and price are never trusted from the Android request.
+        RoutingResult routing = routingService.calculate(
+                request.getOrigin(), request.getStops(), request.getDestination());
+
         // Create origin Location
         Location origin = new Location();
         origin.setLongitude(request.getOrigin().getLongitude());
@@ -103,14 +111,15 @@ public class RideServiceImpl implements RideService {
         Route route = new Route();
         route.setOrigin(origin);
         route.setDestination(destination);
-        route.setDistance(request.getDistanceKm());
-        route.setDuration(request.getDurationMinutes());
+        route.setDistance(routing.distanceKm());
+        route.setDuration(routing.durationMinutes());
+        route.setGeometry(new ArrayList<>(routing.geometry()));
         routeRepository.save(route);
 
         // Find suitable driver for ride
         List<Driver> drivers = driverRepository.filterAvailableDrivers(DriverStatus.ACTIVE ,request.isBabyFriendly(), request.isPetFriendly(), request.getVehicleType());
         Driver driver = findDriver(drivers, request.getScheduledTime(),
-                request.getDurationMinutes(), request.getOrigin());
+                routing.durationMinutes(), request.getOrigin());
 
         // Create ride
         Ride ride = new Ride();
@@ -120,7 +129,7 @@ public class RideServiceImpl implements RideService {
         ride.setRoute(route);
         ride.setBabyFriendly(request.isBabyFriendly());
         ride.setPetFriendly(request.isPetFriendly());
-        applyPriceSnapshot(ride, request.getVehicleType(), request.getDistanceKm());
+        applyPriceSnapshot(ride, request.getVehicleType(), routing.distanceKm());
 
         // Linked passengers
         List<Passenger> registeredPassengers = resolvePassengers(request.getPassengerEmails());
@@ -269,6 +278,12 @@ public class RideServiceImpl implements RideService {
 
             // Check currently active ride
             Ride active = d.getActiveRide();
+            if (active == null && d.getVehicle() != null
+                    && Boolean.TRUE.equals(d.getVehicle().getBusy())) {
+                // A vehicle marked busy without a regular active ride may belong
+                // to a guest ride or stale external process; never assign it as free.
+                continue;
+            }
             if (active != null) {
                 // When is currently active ride ending
                 LocalDateTime activeStart = active.getStartTime() == null
@@ -309,21 +324,54 @@ public class RideServiceImpl implements RideService {
         }
 
         if (!perfectCandidates.isEmpty()) {
-            return perfectCandidates.stream()
-                    .min(Comparator.comparingDouble(driver ->
-                            distanceToOrigin(driver.getVehicle() == null
-                                    ? null : driver.getVehicle().getLocation(), origin)))
-                    .orElse(null);
+            return nearestByRoad(perfectCandidates, driver -> driver.getVehicle() == null
+                    ? null : idleVehiclePositionService.currentLocation(driver.getVehicle()), origin);
         }
 
         if (!busyButFinishingCandidates.isEmpty()) {
-            return busyButFinishingCandidates.stream()
-                    .min(Comparator.comparingDouble(driver -> distanceToOrigin(
-                            driver.getActiveRide().getRoute().getDestination(), origin)))
-                    .orElse(null);
+            return nearestByRoad(busyButFinishingCandidates,
+                    driver -> locationDto(driver.getActiveRide().getRoute().getDestination()), origin);
         }
         // No available drivers
         return null;
+    }
+
+    private Driver nearestByRoad(List<Driver> candidates,
+                                 Function<Driver, LocationDTO> locationProvider,
+                                 LocationDTO origin) {
+        List<Driver> located = new ArrayList<>();
+        List<LocationDTO> candidateLocations = new ArrayList<>();
+        for (Driver driver : candidates) {
+            LocationDTO location = locationProvider.apply(driver);
+            if (location != null) {
+                located.add(driver);
+                candidateLocations.add(location);
+            }
+        }
+        if (located.isEmpty()) return candidates.get(0);
+        try {
+            List<Double> distances = routingService.roadDistancesToDestination(
+                    candidateLocations, origin);
+            if (distances.size() != located.size()) {
+                throw new ResponseStatusException(HttpStatus.BAD_GATEWAY,
+                        "Routing servis nije vratio udaljenost za sva vozila");
+            }
+            int bestIndex = 0;
+            for (int i = 1; i < distances.size(); i++) {
+                if (distances.get(i) < distances.get(bestIndex)) bestIndex = i;
+            }
+            return located.get(bestIndex);
+        } catch (ResponseStatusException exception) {
+            return located.stream()
+                    .min(Comparator.comparingDouble(driver -> distanceToOrigin(
+                            candidateLocations.get(located.indexOf(driver)), origin)))
+                    .orElse(located.get(0));
+        }
+    }
+
+    private static LocationDTO locationDto(Location location) {
+        return location == null ? null : new LocationDTO(location.getLongitude(),
+                location.getLatitude(), location.getAddress());
     }
 
     // Time interval overlap
@@ -360,7 +408,7 @@ public class RideServiceImpl implements RideService {
                 ? (int) Duration.between(effectiveStart, effectiveEnd).toMinutes() : 0;
     }
 
-    private static double distanceToOrigin(Location location, LocationDTO origin) {
+    private static double distanceToOrigin(LocationDTO location, LocationDTO origin) {
         if (location == null) return Double.MAX_VALUE;
         double lat1 = Math.toRadians(location.getLatitude());
         double lat2 = Math.toRadians(origin.getLatitude());
@@ -474,30 +522,17 @@ public class RideServiceImpl implements RideService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Ride route is missing");
         }
 
-        Location origin = ride.getRoute().getOrigin();
-        Location destination = ride.getRoute().getDestination();
-
         int durationMinutes = ride.getRoute().getDuration() <= 0
                 ? 1
                 : ride.getRoute().getDuration();
 
         double progress = calculateTrackingProgress(ride, durationMinutes);
 
-        double currentLongitude = interpolate(
-                origin.getLongitude(),
-                destination.getLongitude(),
-                progress
-        );
-
-        double currentLatitude = interpolate(
-                origin.getLatitude(),
-                destination.getLatitude(),
-                progress
-        );
+        RoutePoint currentPoint = pointAlongRoute(ride.getRoute(), progress);
 
         LocationDTO vehicleLocation = new LocationDTO(
-                currentLongitude,
-                currentLatitude,
+                currentPoint.getLongitude(),
+                currentPoint.getLatitude(),
                 "Vehicle current location"
         );
 
@@ -513,7 +548,8 @@ public class RideServiceImpl implements RideService {
                 vehicleLocation,
                 eta,
                 ride.getStatus().name(),
-                progressPercent
+                progressPercent,
+                routeGeometry(ride.getRoute())
         );
     }
 
@@ -539,7 +575,64 @@ public class RideServiceImpl implements RideService {
 
     }
 
-    private double interpolate(double start, double end, double progress) {
+    static RoutePoint pointAlongRoute(Route route, double progress) {
+        List<RoutePoint> points = route.getGeometry();
+        if (points == null || points.size() < 2) {
+            return new RoutePoint(
+                    interpolate(route.getOrigin().getLongitude(),
+                            route.getDestination().getLongitude(), progress),
+                    interpolate(route.getOrigin().getLatitude(),
+                            route.getDestination().getLatitude(), progress));
+        }
+        double total = 0.0;
+        double[] segments = new double[points.size() - 1];
+        for (int i = 1; i < points.size(); i++) {
+            segments[i - 1] = segmentDistance(points.get(i - 1), points.get(i));
+            total += segments[i - 1];
+        }
+        if (total == 0.0) return points.get(0);
+        double target = total * progress;
+        double covered = 0.0;
+        for (int i = 0; i < segments.length; i++) {
+            if (covered + segments[i] >= target) {
+                double segmentProgress = segments[i] == 0.0
+                        ? 0.0 : (target - covered) / segments[i];
+                RoutePoint from = points.get(i);
+                RoutePoint to = points.get(i + 1);
+                return new RoutePoint(
+                        interpolate(from.getLongitude(), to.getLongitude(), segmentProgress),
+                        interpolate(from.getLatitude(), to.getLatitude(), segmentProgress));
+            }
+            covered += segments[i];
+        }
+        return points.get(points.size() - 1);
+    }
+
+    private static List<LocationDTO> routeGeometry(Route route) {
+        if (route.getGeometry() == null || route.getGeometry().isEmpty()) {
+            return List.of(
+                    new LocationDTO(route.getOrigin().getLongitude(),
+                            route.getOrigin().getLatitude(), route.getOrigin().getAddress()),
+                    new LocationDTO(route.getDestination().getLongitude(),
+                            route.getDestination().getLatitude(), route.getDestination().getAddress()));
+        }
+        return route.getGeometry().stream()
+                .map(point -> new LocationDTO(point.getLongitude(), point.getLatitude(), null))
+                .toList();
+    }
+
+    private static double segmentDistance(RoutePoint first, RoutePoint second) {
+        double lat1 = Math.toRadians(first.getLatitude());
+        double lat2 = Math.toRadians(second.getLatitude());
+        double dLat = lat2 - lat1;
+        double dLon = Math.toRadians(second.getLongitude() - first.getLongitude());
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(lat1) * Math.cos(lat2)
+                * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        return 6371.0 * 2.0 * Math.atan2(Math.sqrt(a), Math.sqrt(1.0 - a));
+    }
+
+    private static double interpolate(double start, double end, double progress) {
         return start + (end - start) * progress;
     }
 

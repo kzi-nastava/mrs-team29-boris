@@ -10,6 +10,7 @@ public class DriverRideHistoryItem {
     private String endTime;
     private RideHistoryLocation origin;
     private RideHistoryLocation destination;
+    private List<RideHistoryLocation> routeGeometry;
     private double totalPrice;
     private String vehicleTypeAtBooking;
     private double basePriceAtBooking;
@@ -49,6 +50,9 @@ public class DriverRideHistoryItem {
     public String getEndTime() { return endTime; }
     public RideHistoryLocation getOrigin() { return origin; }
     public RideHistoryLocation getDestination() { return destination; }
+    public List<RideHistoryLocation> getRouteGeometry() {
+        return routeGeometry == null ? Collections.emptyList() : routeGeometry;
+    }
     public double getTotalPrice() { return totalPrice; }
     public String getVehicleTypeAtBooking() { return vehicleTypeAtBooking; }
     public double getBasePriceAtBooking() { return basePriceAtBooking; }

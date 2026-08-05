@@ -26,6 +26,7 @@ import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.doReturn;
 
 // Testing service for ordering a new ride by registered user
 @ExtendWith(MockitoExtension.class)
@@ -48,6 +49,8 @@ public class CreateRideServiceTest {
     @Mock
     private VehiclePriceRepository vehiclePriceRepository;
     @Mock private AppNotificationService notificationService;
+    @Mock private RoutingService routingService;
+    @Mock private IdleVehiclePositionService idleVehiclePositionService;
 
     @InjectMocks
     private RideServiceImpl rideService;
@@ -84,6 +87,22 @@ public class CreateRideServiceTest {
 
         lenient().when(vehiclePriceRepository.findTopBy()).thenReturn(Optional.of(
                 new VehiclePrice(1L, 150, 500, 250, 120)));
+        lenient().when(routingService.calculate(any(), any(), any())).thenReturn(
+                new RoutingResult(5.0, 30, List.of(
+                        new RoutePoint(19.0, 45.0),
+                        new RoutePoint(20.0, 46.0))));
+        lenient().when(routingService.roadDistancesToDestination(any(), any())).thenAnswer(
+                invocation -> {
+                    List<?> origins = invocation.getArgument(0);
+                    return java.util.Collections.nCopies(origins.size(), 1.0);
+                });
+        lenient().when(idleVehiclePositionService.currentLocation(any(Vehicle.class)))
+                .thenAnswer(invocation -> {
+                    Vehicle vehicle = invocation.getArgument(0);
+                    Location location = vehicle.getLocation();
+                    return new LocationDTO(location.getLongitude(), location.getLatitude(),
+                            location.getAddress());
+                });
     }
 
     // Validate origin and destination are not the same
@@ -178,6 +197,8 @@ public class CreateRideServiceTest {
                 .thenReturn(List.of(farDriver, nearDriver));
         when(rideRepository.findAllByDriverId(any())).thenReturn(List.of());
         when(guestRideRepository.findAllByDriverId(any())).thenReturn(List.of());
+        doReturn(List.of(10.0, 1.0)).when(routingService)
+                .roadDistancesToDestination(any(), any());
         when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> {
             Ride ride = invocation.getArgument(0);
             ride.setId(90L);
@@ -204,6 +225,22 @@ public class CreateRideServiceTest {
         when(passengerRepository.findById(1L)).thenReturn(Optional.of(passenger));
         when(driverRepository.filterAvailableDrivers(any(), anyBoolean(), anyBoolean(), any()))
                 .thenReturn(List.of(blockedDriver));
+
+        RideResponseDTO response = rideService.createRide(validRequest);
+
+        assertEquals(RideStatus.FAILED, response.getStatus());
+    }
+
+    @Test
+    void whenVehicleIsMarkedBusyWithoutRegularActiveRide_thenItIsNotAssigned() {
+        Driver driver = driverAt(30L, 45.25, 19.83);
+        driver.getVehicle().setBusy(true);
+
+        when(passengerRepository.findById(1L)).thenReturn(Optional.of(passenger));
+        when(driverRepository.filterAvailableDrivers(any(), anyBoolean(), anyBoolean(), any()))
+                .thenReturn(List.of(driver));
+        when(rideRepository.findAllByDriverId(driver.getId())).thenReturn(List.of());
+        when(guestRideRepository.findAllByDriverId(driver.getId())).thenReturn(List.of());
 
         RideResponseDTO response = rideService.createRide(validRequest);
 

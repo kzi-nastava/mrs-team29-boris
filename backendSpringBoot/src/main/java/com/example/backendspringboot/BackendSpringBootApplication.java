@@ -1,7 +1,10 @@
 package com.example.backendspringboot;
 
+import com.example.backendspringboot.dto.LocationDTO;
 import com.example.backendspringboot.model.*;
 import com.example.backendspringboot.repositories.*;
+import com.example.backendspringboot.services.RoutingResult;
+import com.example.backendspringboot.services.RoutingService;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -33,7 +36,8 @@ public class BackendSpringBootApplication {
 			LocationRepository locationRepository,
 			RouteRepository routeRepository,
 			PasswordEncoder passwordEncoder,
-			VehiclePriceRepository vehiclePriceRepository) {
+			VehiclePriceRepository vehiclePriceRepository,
+			RoutingService routingService) {
 		return args -> {
 
 			// ------------------ 1. VEHICLE PRICES ------------------
@@ -236,8 +240,88 @@ public class BackendSpringBootApplication {
 
 					rideRepository.save(ride);
 				}
-				System.out.println("Inicijalizacija uspešno završena (9 vožnji, 6 ruta, 2 putnika).");
 			}
+
+			// Dva zauzeta demo vozila moraju imati aktivne vožnje. Sama busy oznaka
+			// nije dovoljna: prikaz položaja prati rutu vozačeve activeRide veze.
+			Driver milos = driverRepository.findByEmail("driver4@demo.com").orElseThrow();
+			Driver nikola = driverRepository.findByEmail("driver5@demo.com").orElseThrow();
+			createDemoActiveRide(milos, jovan, "Zmaj Jovina 5", 45.2570, 19.8440,
+					vp, locationRepository, routeRepository, rideRepository,
+					driverRepository, vehicleRepository, routingService);
+			createDemoActiveRide(nikola, pavle, "Narodnog fronta 22", 45.2390, 19.8310,
+					vp, locationRepository, routeRepository, rideRepository,
+					driverRepository, vehicleRepository, routingService);
+			System.out.println("Inicijalizacija uspešno završena "
+					+ "(9 istorijskih i 2 aktivne demo vožnje).");
 		};
+	}
+
+	private void createDemoActiveRide(
+			Driver driver,
+			Passenger passenger,
+			String destinationAddress,
+			double destinationLatitude,
+			double destinationLongitude,
+			VehiclePrice vehiclePrice,
+			LocationRepository locationRepository,
+			RouteRepository routeRepository,
+			RideRepository rideRepository,
+			DriverRepository driverRepository,
+			VehicleRepository vehicleRepository,
+			RoutingService routingService) {
+		if (driver.getActiveRide() != null) return;
+
+		Location origin = driver.getVehicle().getLocation();
+		Location destination = new Location();
+		destination.setAddress(destinationAddress);
+		destination.setLatitude(destinationLatitude);
+		destination.setLongitude(destinationLongitude);
+		destination = locationRepository.save(destination);
+
+		Route route = new Route();
+		route.setOrigin(origin);
+		route.setDestination(destination);
+		route.setDistance(3.0);
+		// Demo vožnja traje dovoljno dugo da se kretanje vidi i posle Android builda.
+		route.setDuration(600);
+		try {
+			RoutingResult result = routingService.calculate(
+					new LocationDTO(origin.getLongitude(), origin.getLatitude(), origin.getAddress()),
+					List.of(),
+					new LocationDTO(destination.getLongitude(), destination.getLatitude(),
+							destination.getAddress()));
+			route.setDistance(result.distanceKm());
+			route.setGeometry(new ArrayList<>(result.geometry()));
+		} catch (RuntimeException exception) {
+			System.out.println("Demo ruta koristi rezervnu pravu liniju: "
+					+ exception.getMessage());
+		}
+		route = routeRepository.save(route);
+
+		double basePrice = switch (driver.getVehicle().getType()) {
+			case LUXURY -> vehiclePrice.getLuxury();
+			case VAN -> vehiclePrice.getVan();
+			default -> vehiclePrice.getStandard();
+		};
+		Ride ride = new Ride();
+		ride.setDriver(driver);
+		ride.setRoute(route);
+		ride.setPassengers(new ArrayList<>(List.of(passenger)));
+		ride.setRideCreator(passenger);
+		ride.setPrice(Math.round(basePrice + route.getDistance() * vehiclePrice.getPerKm()));
+		ride.setVehicleTypeAtBooking(driver.getVehicle().getType());
+		ride.setBasePriceAtBooking(basePrice);
+		ride.setPricePerKmAtBooking(vehiclePrice.getPerKm());
+		ride.setDistanceKm(route.getDistance());
+		ride.setStatus(RideStatus.STARTED);
+		ride.setScheduledTime(LocalDateTime.now());
+		ride.setStartTime(LocalDateTime.now());
+		ride = rideRepository.save(ride);
+
+		driver.setActiveRide(ride);
+		driverRepository.save(driver);
+		driver.getVehicle().setBusy(true);
+		vehicleRepository.save(driver.getVehicle());
 	}
 }

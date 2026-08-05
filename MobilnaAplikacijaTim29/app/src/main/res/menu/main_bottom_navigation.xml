@@ -1,17 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
     <item
-        android:id="@+id/nav_home"
-        android:icon="@android:drawable/ic_menu_mapmode"
-        android:title="Početna" />
-    <item
-        android:id="@+id/nav_login"
-        android:icon="@android:drawable/ic_lock_lock"
-        android:title="Prijava" />
-    <item
         android:id="@+id/nav_dashboard"
-        android:icon="@android:drawable/ic_menu_manage"
-        android:title="Nalog"
+        android:icon="@android:drawable/ic_menu_mapmode"
+        android:title="Početna"
+        android:visible="false" />
+    <item
+        android:id="@+id/nav_support"
+        android:icon="@android:drawable/ic_dialog_email"
+        android:title="Podrška"
         android:visible="false" />
     <item
         android:id="@+id/nav_profile"
@@ -19,8 +16,12 @@
         android:title="Profil"
         android:visible="false" />
     <item
-        android:id="@+id/nav_support"
-        android:icon="@android:drawable/ic_dialog_email"
-        android:title="Podrška"
+        android:id="@+id/nav_notifications"
+        android:icon="@android:drawable/ic_dialog_info"
+        android:title="Obaveštenja"
         android:visible="false" />
+    <item
+        android:id="@+id/nav_login"
+        android:icon="@android:drawable/ic_lock_lock"
+        android:title="Prijava" />
 </menu>

@@ -144,6 +144,7 @@ public class DriverServiceImpl implements DriverService {
             Location end = ride.getRoute().getDestination();
             dto.setOrigin(new LocationDTO(start.getLongitude(), start.getLatitude(), start.getAddress()));
             dto.setDestination(new LocationDTO(end.getLongitude(), end.getLatitude(), end.getAddress()));
+            dto.setRouteGeometry(routeGeometry(ride.getRoute()));
         }
         return dto;
     }
@@ -177,9 +178,24 @@ public class DriverServiceImpl implements DriverService {
             Location end = guestRide.getRoute().getDestination();
             dto.setOrigin(new LocationDTO(start.getLongitude(), start.getLatitude(), start.getAddress()));
             dto.setDestination(new LocationDTO(end.getLongitude(), end.getLatitude(), end.getAddress()));
+            dto.setRouteGeometry(routeGeometry(guestRide.getRoute()));
         }
 
         return dto;
+    }
+
+    private static List<LocationDTO> routeGeometry(Route route) {
+        if (route.getGeometry() == null || route.getGeometry().isEmpty()) {
+            return List.of(
+                    new LocationDTO(route.getOrigin().getLongitude(), route.getOrigin().getLatitude(),
+                            route.getOrigin().getAddress()),
+                    new LocationDTO(route.getDestination().getLongitude(),
+                            route.getDestination().getLatitude(),
+                            route.getDestination().getAddress()));
+        }
+        return route.getGeometry().stream()
+                .map(point -> new LocationDTO(point.getLongitude(), point.getLatitude(), null))
+                .toList();
     }
 
     private static boolean isHistorical(RideStatus status) {

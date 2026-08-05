@@ -6,6 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 
 import java.util.List;
+import java.util.ArrayList;
 
 @Entity
 @Data
@@ -29,4 +30,9 @@ public class Route {
     private int timesUsed;
 
     private int estimatedTime;
+
+    @ElementCollection
+    @CollectionTable(name = "route_geometry", joinColumns = @JoinColumn(name = "route_id"))
+    @OrderColumn(name = "point_order")
+    private List<RoutePoint> geometry = new ArrayList<>();
 }

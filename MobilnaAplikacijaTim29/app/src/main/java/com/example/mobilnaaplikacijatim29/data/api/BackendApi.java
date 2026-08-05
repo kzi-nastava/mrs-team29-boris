@@ -1,6 +1,8 @@
 package com.example.mobilnaaplikacijatim29.data.api;
 
 import com.example.mobilnaaplikacijatim29.data.model.ActiveVehicleResponse;
+import com.example.mobilnaaplikacijatim29.data.model.RoutePreviewRequest;
+import com.example.mobilnaaplikacijatim29.data.model.RoutePreviewResponse;
 import com.example.mobilnaaplikacijatim29.data.model.LoginRequest;
 import com.example.mobilnaaplikacijatim29.data.model.LoginResponse;
 import com.example.mobilnaaplikacijatim29.data.model.ForgotPasswordRequest;
@@ -138,6 +140,11 @@ public interface BackendApi {
 
     @GET("api/vehicles/active")
     Call<List<ActiveVehicleResponse>> getActiveVehicles();
+
+    @POST("api/routing/preview")
+    Call<RoutePreviewResponse> previewRoute(
+            @Header("Authorization") String authorization,
+            @Body RoutePreviewRequest request);
 
     @POST("api/user/auth/login")
     Call<LoginResponse> login(@Body LoginRequest request);

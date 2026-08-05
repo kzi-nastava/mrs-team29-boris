@@ -48,15 +48,5 @@ public class AdminDashboardFragment extends Fragment {
         reports.setVisibility(View.VISIBLE);
         reports.setOnClickListener(v ->
                 ((MainActivity) requireActivity()).navigateTo(R.id.nav_reports));
-        view.findViewById(R.id.notifications_button).setOnClickListener(v ->
-                ((MainActivity) requireActivity()).navigateTo(R.id.nav_notifications));
-        view.findViewById(R.id.dashboard_logout).setOnClickListener(v ->
-                ((MainActivity) requireActivity()).requestLogout(message -> showMessage(view, message)));
-    }
-
-    private void showMessage(View view, String message) {
-        TextView messageView = view.findViewById(R.id.dashboard_message);
-        messageView.setText(message);
-        messageView.setVisibility(View.VISIBLE);
     }
 }

@@ -33,13 +33,5 @@ public class PassengerDashboardFragment extends Fragment {
         reports.setVisibility(View.VISIBLE);
         reports.setOnClickListener(v ->
                 ((MainActivity) requireActivity()).navigateTo(R.id.nav_reports));
-        view.findViewById(R.id.notifications_button).setOnClickListener(v ->
-                ((MainActivity) requireActivity()).navigateTo(R.id.nav_notifications));
-        view.findViewById(R.id.dashboard_logout).setOnClickListener(v ->
-                ((MainActivity) requireActivity()).requestLogout(message -> {
-                    TextView messageView = view.findViewById(R.id.dashboard_message);
-                    messageView.setText(message);
-                    messageView.setVisibility(View.VISIBLE);
-                }));
     }
 }

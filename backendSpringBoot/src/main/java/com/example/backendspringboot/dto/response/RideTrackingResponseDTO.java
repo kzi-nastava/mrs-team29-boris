@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter @Setter
 @NoArgsConstructor  @AllArgsConstructor
 public class RideTrackingResponseDTO {
@@ -15,4 +17,5 @@ public class RideTrackingResponseDTO {
 
     private String status;
     private double progressPercent;
+    private List<LocationDTO> routeGeometry;
 }
