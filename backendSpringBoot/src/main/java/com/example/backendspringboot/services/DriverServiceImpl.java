@@ -118,8 +118,15 @@ public class DriverServiceImpl implements DriverService {
         dto.setCanceledBy(ride.getCancelledBy() == null ? null : ride.getCancelledBy().getEmail());
         dto.setCancellationReason(ride.getCancellationReason());
         dto.setGuest(false);
-        List<Passenger> ridePassengers = ride.getPassengers() == null
-                ? Collections.emptyList() : ride.getPassengers();
+        List<Passenger> ridePassengers = new ArrayList<>();
+        if (ride.getRideCreator() != null) ridePassengers.add(ride.getRideCreator());
+        if (ride.getPassengers() != null) {
+            for (Passenger passenger : ride.getPassengers()) {
+                boolean duplicate = ridePassengers.stream().anyMatch(existing ->
+                        existing.getId().equals(passenger.getId()));
+                if (!duplicate) ridePassengers.add(passenger);
+            }
+        }
         dto.setPassengers(ridePassengers.stream().map(passenger ->
                 new com.example.backendspringboot.dto.response.RidePassengerResponseDTO(
                         passenger.getId(), passenger.getName(), passenger.getSurname(),

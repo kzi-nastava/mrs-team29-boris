@@ -249,12 +249,18 @@ public class HomeFragment extends Fragment {
         if (bookingLine != null) mapView.getOverlays().remove(bookingLine);
         List<GeoPoint> waypointPoints = bookingPoints();
         for (int i = 0; i < waypointPoints.size(); i++) {
+            boolean isOrigin = i == 0;
+            boolean isDestination = destination != null && i == waypointPoints.size() - 1;
             Marker marker = new Marker(mapView);
             marker.setPosition(waypointPoints.get(i));
             marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
-            marker.setTitle(i == 0 ? "Polazište"
-                    : destination != null && i == waypointPoints.size() - 1 ? "Odredište"
+            marker.setTitle(isOrigin ? "Polazište"
+                    : isDestination ? "Odredište"
                     : "Stanica " + i);
+            marker.setIcon(ContextCompat.getDrawable(requireContext(),
+                    isOrigin ? R.drawable.ic_route_origin
+                            : isDestination ? R.drawable.ic_route_destination
+                            : R.drawable.ic_route_stop));
             bookingMarkers.add(marker);
             mapView.getOverlays().add(marker);
         }

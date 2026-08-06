@@ -11,6 +11,8 @@ import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.http.HttpStatus;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
 
@@ -36,6 +38,9 @@ public class RideServiceTest {
     @Mock
     private LocationRepository locationRepository;
 
+    @Mock
+    private AppNotificationService notificationService;
+
     @InjectMocks
     private RideServiceImpl rideService;
 
@@ -51,6 +56,8 @@ public class RideServiceTest {
         vehicle.setBusy(true);
 
         driver = new Driver();
+        driver.setId(10L);
+        driver.setEmail("driver@example.com");
         driver.setVehicle(vehicle);
 
         ride = new Ride();
@@ -104,5 +111,53 @@ public class RideServiceTest {
 
         assertThrows(RuntimeException.class,
                 () -> rideService.stopRide(1L, dto));
+    }
+
+    @Test
+    void assignedDriverStartsScheduledRide() {
+        Passenger creator = new Passenger();
+        creator.setId(20L);
+        ride.setRideCreator(creator);
+        ride.setStatus(RideStatus.SCHEDULED);
+        driver.setActiveRide(null);
+        vehicle.setBusy(false);
+        when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+
+        rideService.startRide(1L, false, "driver@example.com");
+
+        assertEquals(RideStatus.STARTED, ride.getStatus());
+        assertNotNull(ride.getStartTime());
+        assertSame(ride, driver.getActiveRide());
+        assertTrue(vehicle.getBusy());
+        verify(rideRepository).save(ride);
+        verify(driverRepository).save(driver);
+        verify(vehicleRepository).save(vehicle);
+        verify(notificationService).notify(creator, ride, "RIDE_STARTED",
+                "Vožnja #1 je započeta.", "ride:1:started:20");
+    }
+
+    @Test
+    void differentDriverCannotStartAssignedRide() {
+        ride.setStatus(RideStatus.SCHEDULED);
+        driver.setActiveRide(null);
+        vehicle.setBusy(false);
+        when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> rideService.startRide(1L, false, "other@example.com"));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
+        assertEquals(RideStatus.SCHEDULED, ride.getStatus());
+        assertNull(ride.getStartTime());
+    }
+
+    @Test
+    void rideCannotBeStartedTwice() {
+        when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> rideService.startRide(1L, false, "driver@example.com"));
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
     }
 }

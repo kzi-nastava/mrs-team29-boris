@@ -90,12 +90,15 @@ public class RideController {
 
     // Starting the ride
     @PostMapping("/{id}/start")
+    @PreAuthorize("hasRole('DRIVER')")
     public ResponseEntity<Void> startRide(
             @PathVariable Long id,
-            @RequestBody Map<String, Boolean> body) {
+            @RequestBody(required = false) Map<String, Boolean> body,
+            Authentication authentication) {
 
-        boolean isGuest = body.getOrDefault("isGuest", false);
-        rideService.startRide(id, isGuest);
+        Driver driver = (Driver) authentication.getPrincipal();
+        boolean isGuest = body != null && body.getOrDefault("isGuest", false);
+        rideService.startRide(id, isGuest, driver.getEmail());
 
         // WebSocket msg
         Map<String, Object> message = Map.of(
@@ -134,16 +137,28 @@ public class RideController {
     // 2.6.2: Following the ride
     @GetMapping("/{id}/tracking")
     @PreAuthorize("hasAnyRole('USER', 'DRIVER', 'ADMIN')")
-    public ResponseEntity<RideTrackingResponseDTO> getRideTracking(@PathVariable Long id) {
+    public ResponseEntity<RideTrackingResponseDTO> getRideTracking(
+            @PathVariable Long id, Authentication authentication) {
+        if (authentication == null || !(authentication.getPrincipal() instanceof User requester)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
+        rideService.assertCanTrackRide(id, requester);
         return ResponseEntity.ok(rideService.getRideTracking(id));
     }
 
     @GetMapping("/driver/{driverId}")
+    @PreAuthorize("hasRole('DRIVER')")
     public ResponseEntity<Page<ScheduledRideResponseDTO>> getDriverScheduledRides(
             @PathVariable Long driverId,
             @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "6") int size
+            @RequestParam(defaultValue = "6") int size,
+            Authentication authentication
     ) {
+        Driver driver = (Driver) authentication.getPrincipal();
+        if (!driver.getId().equals(driverId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Nemate pristup vožnjama drugog vozača.");
+        }
         Page<ScheduledRideResponseDTO> rides = rideService.getDriverScheduledRides(driverId, page, size);
         return ResponseEntity.ok(rides);
     }

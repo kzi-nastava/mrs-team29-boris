@@ -4,6 +4,7 @@ import com.example.backendspringboot.dto.request.*;
 import com.example.backendspringboot.dto.response.*;
 import com.example.backendspringboot.model.Ride;
 import com.example.backendspringboot.model.VehiclePrice;
+import com.example.backendspringboot.model.User;
 import jakarta.validation.Valid;
 import org.springframework.data.domain.Page;
 
@@ -13,7 +14,7 @@ public interface RideService {
     RideResponseDTO createRide(CreateRideRequestDTO request);
 //    void cancelRide(Long rideId, RideCancellationRequestDTO request);
     void panic(Long rideId);
-    void startRide(Long rideId, boolean isGuest);
+    void startRide(Long rideId, boolean isGuest, String driverEmail);
     void stopRide(Long rideId, RideStopRequestDTO request);
     void finishRide(Long rideId, String driverEmail, double distance, boolean isGuest);
 
@@ -25,5 +26,6 @@ public interface RideService {
     PassengerRideDetailsResponseDTO getRideDetails(Long rideId);
 
     RideTrackingResponseDTO getRideTracking(Long rideId);
+    void assertCanTrackRide(Long rideId, User requester);
 
 }

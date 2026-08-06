@@ -3,6 +3,7 @@ package com.example.mobilnaaplikacijatim29.data.api;
 import com.example.mobilnaaplikacijatim29.data.model.ActiveVehicleResponse;
 import com.example.mobilnaaplikacijatim29.data.model.RoutePreviewRequest;
 import com.example.mobilnaaplikacijatim29.data.model.RoutePreviewResponse;
+import com.example.mobilnaaplikacijatim29.data.model.RideTrackingResponse;
 import com.example.mobilnaaplikacijatim29.data.model.LoginRequest;
 import com.example.mobilnaaplikacijatim29.data.model.LoginResponse;
 import com.example.mobilnaaplikacijatim29.data.model.ForgotPasswordRequest;
@@ -47,6 +48,9 @@ import com.example.mobilnaaplikacijatim29.data.model.VehiclePriceConfig;
 import com.example.mobilnaaplikacijatim29.data.model.CreateRideRequest;
 import com.example.mobilnaaplikacijatim29.data.model.RideBookingResponse;
 import com.example.mobilnaaplikacijatim29.data.model.AppNotification;
+import com.example.mobilnaaplikacijatim29.data.model.PageResponse;
+import com.example.mobilnaaplikacijatim29.data.model.ScheduledRide;
+import com.example.mobilnaaplikacijatim29.data.model.StartRideRequest;
 
 public interface BackendApi {
 
@@ -66,6 +70,19 @@ public interface BackendApi {
     Call<RideBookingResponse> createRide(
             @Header("Authorization") String authorization,
             @Body CreateRideRequest request);
+
+    @GET("api/rides/driver/{driverId}")
+    Call<PageResponse<ScheduledRide>> getDriverScheduledRides(
+            @Header("Authorization") String authorization,
+            @Path("driverId") long driverId,
+            @Query("page") int page,
+            @Query("size") int size);
+
+    @POST("api/rides/{id}/start")
+    Call<Void> startRide(
+            @Header("Authorization") String authorization,
+            @Path("id") long rideId,
+            @Body StartRideRequest request);
 
     @GET("api/chat/support/messages")
     Call<List<SupportMessage>> getSupportMessages(
@@ -145,6 +162,11 @@ public interface BackendApi {
     Call<RoutePreviewResponse> previewRoute(
             @Header("Authorization") String authorization,
             @Body RoutePreviewRequest request);
+
+    @GET("api/rides/{id}/tracking")
+    Call<RideTrackingResponse> getRideTracking(
+            @Header("Authorization") String authorization,
+            @Path("id") long rideId);
 
     @POST("api/user/auth/login")
     Call<LoginResponse> login(@Body LoginRequest request);

@@ -13,4 +13,6 @@ public interface EmailService {
     void sendActivationEmail(Passenger passenger);
     // Mail for completing registration process
     void sendDriverRegistrationEmail(Driver driver, String registrationLink);
+    void sendRideTrackingEmail(String recipient, String subject,
+                               String message, String trackingLink);
 }

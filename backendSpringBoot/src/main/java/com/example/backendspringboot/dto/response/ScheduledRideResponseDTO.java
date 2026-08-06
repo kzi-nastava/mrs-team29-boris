@@ -6,6 +6,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -16,4 +17,5 @@ public class ScheduledRideResponseDTO {
     private String destination;
     private LocalDateTime scheduledTime;
     private boolean guest;
+    private List<RidePassengerResponseDTO> passengers;
 }

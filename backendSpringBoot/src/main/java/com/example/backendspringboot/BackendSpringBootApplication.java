@@ -195,6 +195,14 @@ public class BackendSpringBootApplication {
 				jovan = passengerRepository.findByEmail("passenger@demo.com").get();
 				pavle = passengerRepository.findByEmail("makspavle@gmail.com").get();
 			}
+			Passenger ana = findOrCreateDemoPassenger(
+					passengerRepository, passwordEncoder,
+					"Ana", "Anic", "ana.putnik@demo.com", "ana123",
+					"0615550101", "Bulevar oslobođenja 80");
+			Passenger milica = findOrCreateDemoPassenger(
+					passengerRepository, passwordEncoder,
+					"Milica", "Petrovic", "milica.putnik@demo.com", "milica123",
+					"0615550102", "Cara Dušana 30");
 
 			// ------------------ 6. RIDES (9 VOŽNJI) ------------------
 			if (rideRepository.count() == 0) {
@@ -246,15 +254,39 @@ public class BackendSpringBootApplication {
 			// nije dovoljna: prikaz položaja prati rutu vozačeve activeRide veze.
 			Driver milos = driverRepository.findByEmail("driver4@demo.com").orElseThrow();
 			Driver nikola = driverRepository.findByEmail("driver5@demo.com").orElseThrow();
-			createDemoActiveRide(milos, jovan, "Zmaj Jovina 5", 45.2570, 19.8440,
+			createDemoActiveRide(milos, ana, "Zmaj Jovina 5", 45.2570, 19.8440,
 					vp, locationRepository, routeRepository, rideRepository,
 					driverRepository, vehicleRepository, routingService);
-			createDemoActiveRide(nikola, pavle, "Narodnog fronta 22", 45.2390, 19.8310,
+			createDemoActiveRide(nikola, milica, "Narodnog fronta 22", 45.2390, 19.8310,
 					vp, locationRepository, routeRepository, rideRepository,
 					driverRepository, vehicleRepository, routingService);
 			System.out.println("Inicijalizacija uspešno završena "
-					+ "(9 istorijskih i 2 aktivne demo vožnje).");
+					+ "(9 istorijskih i 2 aktivne demo vožnje, 4 putnika).");
 		};
+	}
+
+	private Passenger findOrCreateDemoPassenger(
+			PassengerRepository passengerRepository,
+			PasswordEncoder passwordEncoder,
+			String name,
+			String surname,
+			String email,
+			String password,
+			String phone,
+			String address) {
+		return passengerRepository.findByEmail(email).orElseGet(() -> {
+			Passenger passenger = new Passenger();
+			passenger.setName(name);
+			passenger.setSurname(surname);
+			passenger.setEmail(email);
+			passenger.setPassword(passwordEncoder.encode(password));
+			passenger.setActivated(true);
+			passenger.setPhone(phone);
+			passenger.setGender(Gender.FEMALE);
+			passenger.setAddress(address);
+			passenger.setFavoriteRoutes(new ArrayList<>());
+			return passengerRepository.save(passenger);
+		});
 	}
 
 	private void createDemoActiveRide(
@@ -270,7 +302,17 @@ public class BackendSpringBootApplication {
 			DriverRepository driverRepository,
 			VehicleRepository vehicleRepository,
 			RoutingService routingService) {
-		if (driver.getActiveRide() != null) return;
+		if (driver.getActiveRide() != null) {
+			Ride existingRide = driver.getActiveRide();
+			if (existingRide.getStatus() == RideStatus.STARTED
+					&& existingRide.getRoute() != null
+					&& existingRide.getRoute().getDuration() == 600) {
+				existingRide.setRideCreator(passenger);
+				existingRide.setPassengers(new ArrayList<>(List.of(passenger)));
+				rideRepository.save(existingRide);
+			}
+			return;
+		}
 
 		Location origin = driver.getVehicle().getLocation();
 		Location destination = new Location();

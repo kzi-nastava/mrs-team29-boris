@@ -31,6 +31,7 @@ import com.example.mobilnaaplikacijatim29.ui.driver.DriverDashboardFragment;
 import com.example.mobilnaaplikacijatim29.ui.driver.DriverRideDetailFragment;
 import com.example.mobilnaaplikacijatim29.ui.driver.DriverRideHistoryFragment;
 import com.example.mobilnaaplikacijatim29.ui.home.HomeFragment;
+import com.example.mobilnaaplikacijatim29.ui.passenger.CurrentRideFragment;
 import com.example.mobilnaaplikacijatim29.ui.profile.ProfileFragment;
 import com.example.mobilnaaplikacijatim29.ui.admin.ProfileChangeRequestsFragment;
 import com.example.mobilnaaplikacijatim29.ui.admin.UserBlockingFragment;
@@ -51,6 +52,7 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
     public static final String EXTRA_OPEN_NOTIFICATIONS = "open_notifications";
+    public static final String EXTRA_OPEN_RIDE_ID = "open_ride_id";
 
     public interface LogoutCallback {
         void onFailure(String message);
@@ -61,6 +63,7 @@ public class MainActivity extends AppCompatActivity {
     private final Handler notificationHandler = new Handler(Looper.getMainLooper());
     private final Runnable notificationRefresh = this::pollNotifications;
     private boolean notificationRequestInProgress;
+    private Long pendingRideId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -135,7 +138,20 @@ public class MainActivity extends AppCompatActivity {
     public void navigateAfterLogin() {
         configureNavigationForSession();
         scheduleNotificationPoll(0);
+        if (pendingRideId != null) {
+            long rideId = pendingRideId;
+            pendingRideId = null;
+            navigateToRideTracking(rideId);
+            return;
+        }
         bottomNavigation.setSelectedItemId(R.id.nav_dashboard);
+    }
+
+    public void navigateToRideTracking(long rideId) {
+        getSupportFragmentManager().beginTransaction()
+                .replace(R.id.fragment_container, CurrentRideFragment.newInstance(rideId))
+                .addToBackStack(null)
+                .commit();
     }
 
     public void navigateToDriverRideDetail(long rideId, boolean guest) {
@@ -334,10 +350,24 @@ public class MainActivity extends AppCompatActivity {
             showDestination(R.id.nav_complete_driver_registration, token);
             return true;
         }
+        if ("ride-tracking".equalsIgnoreCase(data.getHost())) {
+            try {
+                return openRide(Long.parseLong(data.getQueryParameter("rideId")));
+            } catch (Exception exception) {
+                Toast.makeText(this, "Link za praćenje vožnje nije ispravan.",
+                        Toast.LENGTH_LONG).show();
+                return true;
+            }
+        }
         return false;
     }
 
     private boolean handleAppIntent(Intent intent) {
+        if (intent != null && intent.hasExtra(EXTRA_OPEN_RIDE_ID)) {
+            long rideId = intent.getLongExtra(EXTRA_OPEN_RIDE_ID, -1L);
+            intent.removeExtra(EXTRA_OPEN_RIDE_ID);
+            if (rideId > 0) return openRide(rideId);
+        }
         if (intent != null && intent.getBooleanExtra(EXTRA_OPEN_NOTIFICATIONS, false)
                 && sessionManager.isLoggedIn()) {
             intent.removeExtra(EXTRA_OPEN_NOTIFICATIONS);
@@ -345,5 +375,18 @@ public class MainActivity extends AppCompatActivity {
             return true;
         }
         return handleDeepLink(intent);
+    }
+
+    private boolean openRide(long rideId) {
+        if (sessionManager.isLoggedIn()) {
+            navigateToRideTracking(rideId);
+        } else {
+            pendingRideId = rideId;
+            clearNavigationSelection();
+            showDestination(R.id.nav_login, null);
+            Toast.makeText(this, "Prijavite se da biste pratili vožnju.",
+                    Toast.LENGTH_LONG).show();
+        }
+        return true;
     }
 }

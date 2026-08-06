@@ -12,6 +12,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
 import com.example.mobilnaaplikacijatim29.R;
+import com.example.mobilnaaplikacijatim29.MainActivity;
 import com.example.mobilnaaplikacijatim29.data.api.ApiClient;
 import com.example.mobilnaaplikacijatim29.data.model.AppNotification;
 import com.example.mobilnaaplikacijatim29.data.session.SessionManager;
@@ -90,6 +91,12 @@ public class NotificationsFragment extends Fragment {
                     + (value.getRideId() == null ? "" : "\nVožnja #" + value.getRideId())
                     + "\n" + displayDate(value.getCreatedAt()));
             card.addView(text);
+            if (value.getRideId() != null && !"RIDE_REJECTED".equals(value.getType())) {
+                card.setClickable(true);
+                card.setFocusable(true);
+                card.setOnClickListener(view -> ((MainActivity) requireActivity())
+                        .navigateToRideTracking(value.getRideId()));
+            }
             container.addView(card);
         }
     }

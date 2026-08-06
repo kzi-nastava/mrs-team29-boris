@@ -12,6 +12,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -32,6 +33,7 @@ class RidePriceSnapshotTest {
     @Mock EmailService emailService;
     @Mock VehiclePriceRepository vehiclePriceRepository;
     @Mock SimpMessagingTemplate messagingTemplate;
+    @Mock AppNotificationService notificationService;
     @InjectMocks RideServiceImpl service;
 
     @Test
@@ -47,7 +49,11 @@ class RidePriceSnapshotTest {
         Driver driver = new Driver();
         driver.setVehicle(vehicle);
         Passenger creator = new Passenger();
+        creator.setId(10L);
         creator.setEmail("passenger@example.com");
+        Passenger linked = new Passenger();
+        linked.setId(11L);
+        linked.setEmail("linked@example.com");
 
         Ride ride = new Ride();
         ride.setId(5L);
@@ -56,7 +62,8 @@ class RidePriceSnapshotTest {
         ride.setRoute(route);
         ride.setDriver(driver);
         ride.setRideCreator(creator);
-        ride.setPassengers(Collections.emptyList());
+        ride.setPassengers(List.of(linked));
+        ride.setLinkedPassengerEmails(List.of("linked@example.com", "external@example.com"));
         ride.setVehicleTypeAtBooking(VehicleType.STANDARD);
         ride.setBasePriceAtBooking(200);
         ride.setPricePerKmAtBooking(100);
@@ -67,5 +74,11 @@ class RidePriceSnapshotTest {
         assertEquals(700, ride.getPrice());
         assertEquals(5, ride.getDistanceKm());
         verify(vehiclePriceRepository, never()).findTopBy();
+        verify(emailService, times(3)).sendRideTrackingEmail(anyString(), anyString(),
+                anyString(), eq("clickanddrive://ride-tracking?rideId=5"));
+        verify(notificationService).notify(eq(linked), eq(ride), eq("RIDE_FINISHED"),
+                anyString(), eq("ride:5:finished:11"));
+        verify(notificationService).notify(eq(creator), eq(ride), eq("RIDE_FINISHED"),
+                anyString(), eq("ride:5:finished:10"));
     }
 }

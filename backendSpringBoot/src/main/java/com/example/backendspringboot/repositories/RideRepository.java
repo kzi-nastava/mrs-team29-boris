@@ -20,6 +20,15 @@ public interface RideRepository extends JpaRepository<Ride, Long> {
     Page<Ride> findAllByDriverId(Long driverId, Pageable pageable);
     List<Ride> findAllByStatus(RideStatus status);
 
+    @Query("""
+            SELECT CASE WHEN COUNT(DISTINCT r.id) > 0 THEN true ELSE false END
+            FROM Ride r
+            LEFT JOIN r.passengers p
+            WHERE r.status = 'STARTED'
+              AND (r.rideCreator.id = :passengerId OR p.id = :passengerId)
+            """)
+    boolean existsStartedRideForPassenger(@Param("passengerId") Long passengerId);
+
     @Query("SELECT DISTINCT r FROM Ride r LEFT JOIN r.passengers p " +
             "WHERE (p.id = :passengerId OR r.rideCreator.id = :passengerId) " +
             "AND r.status = 'FINISHED' " +

@@ -59,6 +59,12 @@ public class Ride {
     )
     private List<Passenger> passengers;
 
+    @ElementCollection
+    @CollectionTable(name = "ride_linked_passenger_emails",
+            joinColumns = @JoinColumn(name = "ride_id"))
+    @Column(name = "email", nullable = false)
+    private List<String> linkedPassengerEmails = new ArrayList<>();
+
     @ManyToOne
     @JoinColumn(name = "route_id")
     private Route route;

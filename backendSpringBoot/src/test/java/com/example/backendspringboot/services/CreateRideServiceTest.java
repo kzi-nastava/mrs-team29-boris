@@ -23,10 +23,13 @@ import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyBoolean;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.verifyNoInteractions;
 
 // Testing service for ordering a new ride by registered user
 @ExtendWith(MockitoExtension.class)
@@ -156,6 +159,20 @@ public class CreateRideServiceTest {
         assertEquals("Nalog je blokiran. Razlog: Smoking", exception.getReason());
     }
 
+    @Test
+    void passengerInStartedRideCannotOrderAnotherRide() {
+        when(passengerRepository.findById(1L)).thenReturn(Optional.of(passenger));
+        when(rideRepository.existsStartedRideForPassenger(1L)).thenReturn(true);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> rideService.createRide(validRequest));
+
+        assertEquals(org.springframework.http.HttpStatus.CONFLICT, exception.getStatusCode());
+        assertEquals("Ne možete poručiti novu vožnju dok je trenutna vožnja u toku.",
+                exception.getReason());
+        verifyNoInteractions(driverRepository);
+    }
+
     // No availabl drivers
     @Test
     void whenNoDriverAvailable_thenRideStatusIsFailed() {
@@ -214,6 +231,39 @@ public class CreateRideServiceTest {
         verify(notificationService).notify(nearDriver, nearDriver.getScheduledRides().get(0),
                 "NEW_RIDE", "Dodeljena vam je nova vožnja od Ulica A do Ulica B.",
                 "ride:90:assigned-driver:21");
+    }
+
+    @Test
+    void acceptedRideNotifiesAndEmailsLinkedRegisteredAndExternalPassengers() {
+        Driver driver = driverAt(25L, 45.01, 19.01);
+        Passenger linked = new Passenger();
+        linked.setId(2L);
+        linked.setEmail("linked@example.com");
+        validRequest.setPassengerEmails(List.of("linked@example.com", "external@example.com"));
+
+        when(passengerRepository.findById(1L)).thenReturn(Optional.of(passenger));
+        when(passengerRepository.findByEmail("linked@example.com"))
+                .thenReturn(Optional.of(linked));
+        when(passengerRepository.findByEmail("external@example.com"))
+                .thenReturn(Optional.empty());
+        when(driverRepository.filterAvailableDrivers(any(), anyBoolean(), anyBoolean(), any()))
+                .thenReturn(List.of(driver));
+        when(rideRepository.findAllByDriverId(driver.getId())).thenReturn(List.of());
+        when(guestRideRepository.findAllByDriverId(driver.getId())).thenReturn(List.of());
+        when(rideRepository.save(any(Ride.class))).thenAnswer(invocation -> {
+            Ride ride = invocation.getArgument(0);
+            ride.setId(77L);
+            return ride;
+        });
+
+        rideService.createRide(validRequest);
+
+        verify(notificationService).notify(eq(linked), any(Ride.class), eq("LINKED_RIDE"),
+                anyString(), eq("ride:77:linked:2"));
+        verify(emailService).sendRideTrackingEmail(eq("linked@example.com"), anyString(),
+                anyString(), eq("clickanddrive://ride-tracking?rideId=77"));
+        verify(emailService).sendRideTrackingEmail(eq("external@example.com"), anyString(),
+                anyString(), eq("clickanddrive://ride-tracking?rideId=77"));
     }
 
     // Driver is blocked

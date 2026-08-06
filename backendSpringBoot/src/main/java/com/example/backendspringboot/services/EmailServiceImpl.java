@@ -13,6 +13,7 @@ import org.springframework.mail.SimpleMailMessage;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
 import org.springframework.stereotype.Service;
+import org.springframework.web.util.HtmlUtils;
 
 import java.io.File;
 
@@ -112,6 +113,27 @@ public class EmailServiceImpl implements EmailService {
             javaMailSender.send(message);
         } catch (Exception e) {
             throw new RuntimeException("Failed to send driver registration email", e);
+        }
+    }
+
+    @Override
+    public void sendRideTrackingEmail(String recipient, String subject,
+                                      String text, String trackingLink) {
+        try {
+            MimeMessage message = javaMailSender.createMimeMessage();
+            MimeMessageHelper helper = new MimeMessageHelper(message, true);
+            helper.setFrom(sender);
+            helper.setTo(recipient);
+            helper.setSubject(subject);
+            String safeText = HtmlUtils.htmlEscape(text).replace("\n", "<br/>");
+            String safeLink = HtmlUtils.htmlEscape(trackingLink);
+            helper.setText("<p>" + safeText + "</p>"
+                    + "<p><a href=\"" + safeLink + "\">Otvori praćenje vožnje</a></p>"
+                    + "<p>Ako dugme ne radi, otvorite adresu:<br/>"
+                    + "<a href=\"" + safeLink + "\">" + safeLink + "</a></p>", true);
+            javaMailSender.send(message);
+        } catch (Exception exception) {
+            throw new RuntimeException("Failed to send ride tracking email", exception);
         }
     }
 }

@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <TextView
+        android:id="@+id/current_ride_title"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Trenutna vožnja"
+        android:textAppearance="?attr/textAppearanceHeadlineSmall"
+        android:textStyle="bold" />
+
+    <TextView
+        android:id="@+id/current_ride_status"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="Učitavanje podataka o vožnji..."
+        android:textAppearance="?attr/textAppearanceBodyLarge" />
+
+    <ProgressBar
+        android:id="@+id/current_ride_progress"
+        style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:max="100" />
+
+    <com.google.android.material.card.MaterialCardView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_marginTop="12dp"
+        android:layout_weight="1">
+
+        <org.osmdroid.views.MapView
+            android:id="@+id/current_ride_map"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="Praćenje trenutne vožnje na mapi" />
+    </com.google.android.material.card.MaterialCardView>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="Položaj se osvežava automatski. © OpenStreetMap contributors"
+        android:textAlignment="center"
+        android:textAppearance="?attr/textAppearanceBodySmall" />
+</LinearLayout>

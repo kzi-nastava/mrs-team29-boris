@@ -87,6 +87,10 @@ public class RideServiceImpl implements RideService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "Nalog je blokiran. Razlog: " + reason);
         }
+        if (rideRepository.existsStartedRideForPassenger(creator.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Ne možete poručiti novu vožnju dok je trenutna vožnja u toku.");
+        }
 
         // The backend calculates the authoritative road route. Distance, duration
         // and price are never trusted from the Android request.
@@ -132,8 +136,11 @@ public class RideServiceImpl implements RideService {
         applyPriceSnapshot(ride, request.getVehicleType(), routing.distanceKm());
 
         // Linked passengers
-        List<Passenger> registeredPassengers = resolvePassengers(request.getPassengerEmails());
+        List<String> linkedEmails = normalizeLinkedEmails(
+                request.getPassengerEmails(), creator.getEmail());
+        List<Passenger> registeredPassengers = resolvePassengers(linkedEmails);
         ride.setPassengers(registeredPassengers); // Set linked passengers
+        ride.setLinkedPassengerEmails(linkedEmails);
 
         // Save the passenger who created the ride
         ride.setRideCreator(creator);
@@ -174,7 +181,7 @@ public class RideServiceImpl implements RideService {
             );
 
             // Send notifications and emails to linked passengers for this ride
-            processNotifications(request.getPassengerEmails(), ride, creator);
+            processNotifications(linkedEmails, ride, creator);
 
             return new RideResponseDTO(
                     ride.getId(),
@@ -216,37 +223,51 @@ public class RideServiceImpl implements RideService {
         return passengers;
     }
 
+    private static List<String> normalizeLinkedEmails(List<String> emails, String creatorEmail) {
+        if (emails == null) return new ArrayList<>();
+        return emails.stream()
+                .filter(Objects::nonNull)
+                .map(String::trim)
+                .filter(email -> !email.isBlank())
+                .filter(email -> !email.equalsIgnoreCase(creatorEmail))
+                .map(String::toLowerCase)
+                .distinct()
+                .toList();
+    }
+
     // Helper for sending notifications and emails to linked passengers
     private void processNotifications(List<String> emails, Ride ride, Passenger creator) {
         if (emails == null) return;
 
         for (String email : emails) {
-            Optional<Passenger> passenger = passengerRepository.findByEmail(email);
+            String normalizedEmail = email.trim();
+            Optional<Passenger> passenger = passengerRepository.findByEmail(normalizedEmail);
+            String link = trackingLink(ride);
+            String mailBody = """
+                    Poštovani,
+
+                    Dodati ste na prihvaćenu vožnju #%d od %s do %s.
+                    Vožnju možete pratiti otvaranjem linka na telefonu.
+
+                    ClickAndDrive
+                    """.formatted(ride.getId(), ride.getRoute().getOrigin().getAddress(),
+                    ride.getRoute().getDestination().getAddress());
 
             if (passenger.isPresent()) {
-                // This passenger is registered
                 Passenger p = passenger.get();
                 if (!p.getId().equals(creator.getId())) {
                     notificationService.notify(p, ride, "LINKED_RIDE",
                             creator.getName() + " " + creator.getSurname()
-                                    + " vas je povezao sa vožnjom.",
+                                    + " vas je povezao sa prihvaćenom vožnjom #"
+                                    + ride.getId() + ". Dodirnite za praćenje.",
                             "ride:" + ride.getId() + ":linked:" + p.getId());
+                    emailService.sendRideTrackingEmail(p.getEmail(),
+                            "Dodati ste na vožnju #" + ride.getId(), mailBody, link);
                 }
-            }
-            else {
-                // This passenger is not registered
-                // Send only mail
-                EmailDetails emailToSend = new EmailDetails();
-                emailToSend.setRecipient(email);
-                emailToSend.setSubject("Ride in progress");
-                emailToSend.setMsgBody(
-                        "Hello " +  "\n\n" +
-                                "Your are receiving this email because you've been linked to this drive:\n\n" +
-                                "http://localhost:4200/map" + "\n\n" + // adjust the url to correct page later
-                                "Have a safe ride.\n\n" +
-                                "Best regards"
-                );
-                emailService.sendsSimpleMail(emailToSend);
+            } else {
+                // Neregistrovani primalac dobija samo email, kako specifikacija zahteva.
+                emailService.sendRideTrackingEmail(normalizedEmail,
+                        "Dodati ste na vožnju #" + ride.getId(), mailBody, link);
             }
         }
     }
@@ -478,35 +499,76 @@ public class RideServiceImpl implements RideService {
     }
 
     @Transactional
-    public void startRide(Long rideId, boolean isGuest) {
+    public void startRide(Long rideId, boolean isGuest, String driverEmail) {
         if (isGuest) {
             GuestRide guestRide = guestRideRepository.findById(rideId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "GuestRide not found"));
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND, "Vožnja nije pronađena."));
+            Driver driver = assertAssignedDriver(guestRide.getDriver(), driverEmail);
+            assertRideCanStart(guestRide.getStatus(), driver);
             guestRide.setStatus(RideStatus.STARTED);
             guestRide.setStartTime(LocalDateTime.now());
             guestRideRepository.save(guestRide);
 
-            //set vehicle and driver data
-            Driver driver = guestRide.getDriver();
-            ///TO-DO: can't set active ride because it's diff class
             Vehicle vehicle = driver.getVehicle();
             vehicle.setBusy(true);
             vehicleRepository.save(vehicle);
         } else {
             Ride ride = rideRepository.findById(rideId)
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
+                    .orElseThrow(() -> new ResponseStatusException(
+                            HttpStatus.NOT_FOUND, "Vožnja nije pronađena."));
+            Driver driver = assertAssignedDriver(ride.getDriver(), driverEmail);
+            assertRideCanStart(ride.getStatus(), driver);
             ride.setStatus(RideStatus.STARTED);
             ride.setStartTime(LocalDateTime.now());
             rideRepository.save(ride);
 
-            //set vehicle and driver data
-            Driver driver = ride.getDriver();
             driver.setActiveRide(ride);
             driverRepository.save(driver);
 
             Vehicle vehicle = driver.getVehicle();
             vehicle.setBusy(true);
             vehicleRepository.save(vehicle);
+
+            notifyRideStarted(ride);
+        }
+    }
+
+    private Driver assertAssignedDriver(Driver assignedDriver, String driverEmail) {
+        if (assignedDriver == null || driverEmail == null
+                || !assignedDriver.getEmail().equalsIgnoreCase(driverEmail)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Samo vozač kome je vožnja dodeljena može da je započne.");
+        }
+        return assignedDriver;
+    }
+
+    private void assertRideCanStart(RideStatus status, Driver driver) {
+        if (status != RideStatus.SCHEDULED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Samo zakazana vožnja može da se započne.");
+        }
+        if (driver.getActiveRide() != null
+                || driver.getVehicle() == null
+                || Boolean.TRUE.equals(driver.getVehicle().getBusy())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Vozač već ima aktivnu vožnju.");
+        }
+    }
+
+    private void notifyRideStarted(Ride ride) {
+        Passenger creator = ride.getRideCreator();
+        if (creator != null) {
+            notificationService.notify(creator, ride, "RIDE_STARTED",
+                    "Vožnja #" + ride.getId() + " je započeta.",
+                    "ride:" + ride.getId() + ":started:" + creator.getId());
+        }
+        for (Passenger passenger : safe(ride.getPassengers())) {
+            if (creator == null || !passenger.getId().equals(creator.getId())) {
+                notificationService.notify(passenger, ride, "RIDE_STARTED",
+                        "Vožnja #" + ride.getId() + " je započeta.",
+                        "ride:" + ride.getId() + ":started:" + passenger.getId());
+            }
         }
     }
 
@@ -551,6 +613,26 @@ public class RideServiceImpl implements RideService {
                 progressPercent,
                 routeGeometry(ride.getRoute())
         );
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public void assertCanTrackRide(Long rideId, User requester) {
+        Ride ride = rideRepository.findById(rideId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                        "Vožnja nije pronađena"));
+        if (requester instanceof Administrator) return;
+        if (requester instanceof Driver driver && ride.getDriver() != null
+                && ride.getDriver().getId().equals(driver.getId())) return;
+        if (requester instanceof Passenger passenger) {
+            if (ride.getRideCreator() != null
+                    && ride.getRideCreator().getId().equals(passenger.getId())) return;
+            boolean linked = safe(ride.getPassengers()).stream()
+                    .anyMatch(value -> value.getId().equals(passenger.getId()));
+            if (linked) return;
+        }
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                "Nemate pristup praćenju ove vožnje");
     }
 
     private double calculateTrackingProgress(Ride ride, int durationMinutes) {
@@ -864,36 +946,44 @@ public class RideServiceImpl implements RideService {
 
         String subject = "Ride Summary - " + ride.getId();
         String bodyTemplate = """
-            Dear Passenger,
-            
-            Your ride has been successfully finished.
-            
-            Summary:
-            - Route: %s
-            - Duration: %d minutes
-            - Total Price: %.2f RSD
-            
-            Thank you for riding with us!
+            Poštovani,
+
+            Vaša vožnja je uspešno završena.
+
+            Rezime:
+            - Ruta: %s
+            - Trajanje: %d minuta
+            - Ukupna cena: %.2f RSD
+
+            ClickAndDrive
             """;
 
         String finalBody = String.format(bodyTemplate, routeInfo, minutes, ride.getPrice());
 
-        for (Passenger passenger : ride.getPassengers()) {
-            System.out.println("Email sent to " + passenger.getEmail());
-            sendEmail(passenger.getEmail(), subject, finalBody);
+        LinkedHashSet<String> allEmails = new LinkedHashSet<>(
+                safe(ride.getLinkedPassengerEmails()));
+        for (Passenger passenger : safe(ride.getPassengers())) {
+            allEmails.add(passenger.getEmail());
+            notificationService.notify(passenger, ride, "RIDE_FINISHED",
+                    "Vožnja #" + ride.getId() + " je uspešno završena.",
+                    "ride:" + ride.getId() + ":finished:" + passenger.getId());
         }
 
-        String creatorEmail = ride.getRideCreator().getEmail();
-        System.out.println("Email sent to " + creatorEmail);
-        sendEmail(creatorEmail, subject, finalBody);
+        Passenger creator = ride.getRideCreator();
+        allEmails.add(creator.getEmail());
+        allEmails.forEach(email -> emailService.sendRideTrackingEmail(
+                email, subject, finalBody, trackingLink(ride)));
+        boolean creatorAlreadyLinked = safe(ride.getPassengers()).stream()
+                .anyMatch(passenger -> passenger.getId().equals(creator.getId()));
+        if (!creatorAlreadyLinked) {
+            notificationService.notify(creator, ride, "RIDE_FINISHED",
+                    "Vožnja #" + ride.getId() + " je uspešno završena.",
+                    "ride:" + ride.getId() + ":finished:" + creator.getId());
+        }
     }
 
-    private void sendEmail(String to, String subject, String body) {
-        EmailDetails details = new EmailDetails();
-        details.setRecipient(to);
-        details.setSubject(subject);
-        details.setMsgBody(body);
-        emailService.sendsSimpleMail(details);
+    private static String trackingLink(Ride ride) {
+        return "clickanddrive://ride-tracking?rideId=" + ride.getId();
     }
 
     @Override
@@ -961,7 +1051,12 @@ public class RideServiceImpl implements RideService {
                     r.getRoute().getOrigin().getAddress(),
                     r.getRoute().getDestination().getAddress(),
                     r.getScheduledTime(),
-                    false // false = regular ride
+                    false,
+                    allRidePassengers(r).stream().map(passenger ->
+                            new RidePassengerResponseDTO(
+                                    passenger.getId(), passenger.getName(), passenger.getSurname(),
+                                    passenger.getEmail(), passenger.getPhone(),
+                                    passenger.getProfileImageUrl())).toList()
             ));
         }
 
@@ -971,7 +1066,8 @@ public class RideServiceImpl implements RideService {
                     gr.getRoute().getOrigin().getAddress(),
                     gr.getRoute().getDestination().getAddress(),
                     gr.getScheduledTime(),
-                    true // true = guest ride
+                    true,
+                    List.of()
             ));
         }
 
@@ -982,6 +1078,17 @@ public class RideServiceImpl implements RideService {
         List<ScheduledRideResponseDTO> pagedList = allRides.subList(start, end);
 
         return new PageImpl<>(pagedList, pageable, allRides.size());
+    }
+
+    private static List<Passenger> allRidePassengers(Ride ride) {
+        LinkedHashMap<Long, Passenger> passengers = new LinkedHashMap<>();
+        if (ride.getRideCreator() != null) {
+            passengers.put(ride.getRideCreator().getId(), ride.getRideCreator());
+        }
+        for (Passenger passenger : safe(ride.getPassengers())) {
+            passengers.put(passenger.getId(), passenger);
+        }
+        return new ArrayList<>(passengers.values());
     }
 
     @Override
