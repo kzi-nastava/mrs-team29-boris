@@ -47,6 +47,7 @@ class RidePriceSnapshotTest {
         Vehicle vehicle = new Vehicle();
         vehicle.setType(VehicleType.STANDARD);
         Driver driver = new Driver();
+        driver.setEmail("driver@example.com");
         driver.setVehicle(vehicle);
         Passenger creator = new Passenger();
         creator.setId(10L);
@@ -67,9 +68,10 @@ class RidePriceSnapshotTest {
         ride.setVehicleTypeAtBooking(VehicleType.STANDARD);
         ride.setBasePriceAtBooking(200);
         ride.setPricePerKmAtBooking(100);
+        ride.setDistanceKm(5);
         when(rideRepository.findById(5L)).thenReturn(Optional.of(ride));
 
-        service.finishRide(5L, "driver@example.com", 5, false);
+        service.finishRide(5L, "driver@example.com", 999, false);
 
         assertEquals(700, ride.getPrice());
         assertEquals(5, ride.getDistanceKm());

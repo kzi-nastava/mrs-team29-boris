@@ -26,6 +26,7 @@ public interface RideService {
     PassengerRideDetailsResponseDTO getRideDetails(Long rideId);
 
     RideTrackingResponseDTO getRideTracking(Long rideId);
+    RideTrackingResponseDTO getRideTracking(Long rideId, User requester);
     void assertCanTrackRide(Long rideId, User requester);
 
 }

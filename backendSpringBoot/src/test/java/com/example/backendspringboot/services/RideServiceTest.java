@@ -160,4 +160,15 @@ public class RideServiceTest {
 
         assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
     }
+
+    @Test
+    void differentDriverCannotFinishActiveRide() {
+        when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> rideService.finishRide(1L, "other@example.com", 10, false));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
+        assertEquals(RideStatus.STARTED, ride.getStatus());
+    }
 }

@@ -51,6 +51,7 @@ import com.example.mobilnaaplikacijatim29.data.model.AppNotification;
 import com.example.mobilnaaplikacijatim29.data.model.PageResponse;
 import com.example.mobilnaaplikacijatim29.data.model.ScheduledRide;
 import com.example.mobilnaaplikacijatim29.data.model.StartRideRequest;
+import com.example.mobilnaaplikacijatim29.data.model.RideReviewRequest;
 
 public interface BackendApi {
 
@@ -83,6 +84,18 @@ public interface BackendApi {
             @Header("Authorization") String authorization,
             @Path("id") long rideId,
             @Body StartRideRequest request);
+
+    @PUT("api/rides/{id}/finish")
+    Call<Void> finishRide(
+            @Header("Authorization") String authorization,
+            @Path("id") long rideId,
+            @Query("isGuest") boolean isGuest);
+
+    @POST("api/rides/{id}/review")
+    Call<Void> reviewRide(
+            @Header("Authorization") String authorization,
+            @Path("id") long rideId,
+            @Body RideReviewRequest request);
 
     @GET("api/chat/support/messages")
     Call<List<SupportMessage>> getSupportMessages(

@@ -142,8 +142,7 @@ public class RideController {
         if (authentication == null || !(authentication.getPrincipal() instanceof User requester)) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
         }
-        rideService.assertCanTrackRide(id, requester);
-        return ResponseEntity.ok(rideService.getRideTracking(id));
+        return ResponseEntity.ok(rideService.getRideTracking(id, requester));
     }
 
     @GetMapping("/driver/{driverId}")
@@ -206,9 +205,16 @@ public class RideController {
     // 2.8: Rating
     @PostMapping("/{id}/review")
     @PreAuthorize("hasRole('USER')")
-    public ResponseEntity<?> createReview(@PathVariable Long id, @Valid @RequestBody ReviewRequestDTO dto) {
+    public ResponseEntity<Void> createReview(@PathVariable Long id,
+                                             @Valid @RequestBody ReviewRequestDTO dto,
+                                             Authentication authentication) {
+        if (authentication == null
+                || !(authentication.getPrincipal() instanceof Passenger passenger)) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED);
+        }
         dto.setRideId(id);
-        reviewService.createReview(dto);
+        dto.setPassengerId(passenger.getId());
+        reviewService.createReview(dto, passenger.getId());
         return ResponseEntity.ok().build();
     }
 

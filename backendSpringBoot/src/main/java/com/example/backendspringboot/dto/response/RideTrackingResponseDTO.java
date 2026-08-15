@@ -7,6 +7,7 @@ import lombok.NoArgsConstructor;
 import lombok.Setter;
 
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Getter @Setter
 @NoArgsConstructor  @AllArgsConstructor
@@ -18,4 +19,8 @@ public class RideTrackingResponseDTO {
     private String status;
     private double progressPercent;
     private List<LocationDTO> routeGeometry;
+    private double price;
+    private boolean canReview;
+    private boolean alreadyReviewed;
+    private LocalDateTime reviewDeadline;
 }

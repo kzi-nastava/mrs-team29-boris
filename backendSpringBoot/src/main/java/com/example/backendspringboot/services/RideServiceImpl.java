@@ -575,8 +575,16 @@ public class RideServiceImpl implements RideService {
     @Override
     @Transactional
     public RideTrackingResponseDTO getRideTracking(Long rideId) {
+        return getRideTracking(rideId, null);
+    }
+
+    @Override
+    @Transactional
+    public RideTrackingResponseDTO getRideTracking(Long rideId, User requester) {
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
+
+        if (requester != null) assertCanTrackRide(ride, requester);
 
         if (ride.getRoute() == null ||
                 ride.getRoute().getOrigin() == null ||
@@ -605,13 +613,31 @@ public class RideServiceImpl implements RideService {
 
         double progressPercent = Math.round(progress * 10000.0) / 100.0;
 
+        boolean isCreator = requester instanceof Passenger passenger
+                && ride.getRideCreator() != null
+                && ride.getRideCreator().getId().equals(passenger.getId());
+        boolean alreadyReviewed = isCreator && safe(ride.getReviews()).stream()
+                .anyMatch(review -> review.getPassenger() != null
+                        && review.getPassenger().getId().equals(ride.getRideCreator().getId()));
+        LocalDateTime reviewDeadline = ride.getEndTime() == null
+                ? null : ride.getEndTime().plusDays(3);
+        boolean canReview = isCreator
+                && ride.getStatus() == RideStatus.FINISHED
+                && !alreadyReviewed
+                && reviewDeadline != null
+                && !LocalDateTime.now().isAfter(reviewDeadline);
+
         return new RideTrackingResponseDTO(
                 ride.getId(),
                 vehicleLocation,
                 eta,
                 ride.getStatus().name(),
                 progressPercent,
-                routeGeometry(ride.getRoute())
+                routeGeometry(ride.getRoute()),
+                ride.getPrice(),
+                canReview,
+                alreadyReviewed,
+                reviewDeadline
         );
     }
 
@@ -621,6 +647,10 @@ public class RideServiceImpl implements RideService {
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Vožnja nije pronađena"));
+        assertCanTrackRide(ride, requester);
+    }
+
+    private void assertCanTrackRide(Ride ride, User requester) {
         if (requester instanceof Administrator) return;
         if (requester instanceof Driver driver && ride.getDriver() != null
                 && ride.getDriver().getId().equals(driver.getId())) return;
@@ -824,15 +854,18 @@ public class RideServiceImpl implements RideService {
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
 
+        Driver driver = assertAssignedDriver(ride.getDriver(), driverEmail);
         if (ride.getStatus() != RideStatus.STARTED) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only started rides can be finished.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Samo započeta vožnja može da se završi.");
         }
 
         ride.setStatus(RideStatus.FINISHED);
         ride.setEndTime(LocalDateTime.now());
 
-        Driver driver = ride.getDriver();
-        updateDriverAndVehicleAfterRide(driver, distance, ride.getRoute(), (dist, type) -> {
+        double completedDistance = finishDistance(
+                ride.getDistanceKm(), ride.getRoute(), distance);
+        updateDriverAndVehicleAfterRide(driver, completedDistance, ride.getRoute(), (dist, type) -> {
             ensurePriceSnapshot(ride, type);
             ride.setDistanceKm(dist);
             ride.setPrice(calculateSnapshotPrice(
@@ -847,14 +880,14 @@ public class RideServiceImpl implements RideService {
         GuestRide guestRide = guestRideRepository.findById(rideId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Guest ride not found"));
 
+        Driver driver = assertAssignedDriver(guestRide.getDriver(), driverEmail);
         if (guestRide.getStatus() != RideStatus.STARTED) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Only started guest rides can be finished.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Samo započeta vožnja može da se završi.");
         }
 
         guestRide.setStatus(RideStatus.FINISHED);
         guestRide.setEndTime(LocalDateTime.now());
-
-        Driver driver = guestRide.getDriver();
 
         //GuestRide specific logic, no emails
         Vehicle vehicle = driver.getVehicle();
@@ -864,14 +897,23 @@ public class RideServiceImpl implements RideService {
         vehicle.setLocation(guestRide.getRoute().getDestination());
 
         ensurePriceSnapshot(guestRide, vehicle.getType());
-        guestRide.setDistanceKm(distance);
-        guestRide.setPrice(calculateSnapshotPrice(distance,
+        double completedDistance = finishDistance(
+                guestRide.getDistanceKm(), guestRide.getRoute(), distance);
+        guestRide.setDistanceKm(completedDistance);
+        guestRide.setPrice(calculateSnapshotPrice(completedDistance,
                 guestRide.getBasePriceAtBooking(), guestRide.getPricePerKmAtBooking()));
-        guestRide.getRoute().setDistance(distance);
+        guestRide.getRoute().setDistance(completedDistance);
 
         driverRepository.save(driver);
         vehicleRepository.save(vehicle);
         guestRideRepository.save(guestRide);
+    }
+
+    private static double finishDistance(double bookedDistance, Route route,
+                                         double fallbackDistance) {
+        if (bookedDistance > 0) return bookedDistance;
+        if (route != null && route.getDistance() > 0) return route.getDistance();
+        return Math.max(0, fallbackDistance);
     }
 
     // Helper
@@ -954,6 +996,9 @@ public class RideServiceImpl implements RideService {
             - Ruta: %s
             - Trajanje: %d minuta
             - Ukupna cena: %.2f RSD
+
+            Putnik koji je poručio vožnju može da ostavi ocenu u roku od 3 dana
+            otvaranjem ove vožnje u aplikaciji.
 
             ClickAndDrive
             """;

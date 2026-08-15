@@ -5,24 +5,35 @@ import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.InputFilter;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.EditText;
+import android.widget.LinearLayout;
 import android.widget.ProgressBar;
+import android.widget.RatingBar;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.fragment.app.Fragment;
+import androidx.appcompat.app.AlertDialog;
 
+import com.example.mobilnaaplikacijatim29.MainActivity;
 import com.example.mobilnaaplikacijatim29.R;
 import com.example.mobilnaaplikacijatim29.data.api.ApiClient;
 import com.example.mobilnaaplikacijatim29.data.model.LocationResponse;
+import com.example.mobilnaaplikacijatim29.data.model.RideReviewRequest;
 import com.example.mobilnaaplikacijatim29.data.model.RideTrackingResponse;
 import com.example.mobilnaaplikacijatim29.data.session.SessionManager;
+import com.google.android.material.button.MaterialButton;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 
 import org.osmdroid.tileprovider.tilesource.OnlineTileSourceBase;
 import org.osmdroid.tileprovider.tilesource.TileSourcePolicy;
@@ -58,6 +69,9 @@ public class CurrentRideFragment extends Fragment {
     private TextView title;
     private TextView status;
     private ProgressBar progress;
+    private TextView actionMessage;
+    private MaterialButton finishButton;
+    private MaterialButton reviewButton;
     private Marker vehicleMarker;
     private Polyline routeLine;
     private SessionManager session;
@@ -86,6 +100,9 @@ public class CurrentRideFragment extends Fragment {
         title = view.findViewById(R.id.current_ride_title);
         status = view.findViewById(R.id.current_ride_status);
         progress = view.findViewById(R.id.current_ride_progress);
+        actionMessage = view.findViewById(R.id.current_ride_action_message);
+        finishButton = view.findViewById(R.id.current_ride_finish_button);
+        reviewButton = view.findViewById(R.id.current_ride_review_button);
         long rideId = requireArguments().getLong(ARG_RIDE_ID);
         title.setText("Vožnja #" + rideId);
         map.setTileSource(OPEN_STREET_MAP);
@@ -96,6 +113,8 @@ public class CurrentRideFragment extends Fragment {
                     action != MotionEvent.ACTION_UP && action != MotionEvent.ACTION_CANCEL);
             return false;
         });
+        finishButton.setOnClickListener(v -> confirmFinishRide(rideId));
+        reviewButton.setOnClickListener(v -> showReviewDialog(rideId));
     }
 
     private void loadTracking() {
@@ -137,7 +156,163 @@ public class CurrentRideFragment extends Fragment {
         progress.setProgress((int) Math.round(value.getProgressPercent()));
         renderRoute(value.getRouteGeometry());
         renderVehicle(value.getVehicleLocation());
+        renderActions(value);
         if (!isFinished(value.getStatus())) schedule();
+    }
+
+    private void renderActions(RideTrackingResponse value) {
+        boolean driver = "driver".equalsIgnoreCase(session.getRole());
+        boolean passenger = "user".equalsIgnoreCase(session.getRole());
+        finishButton.setVisibility(driver && "STARTED".equals(value.getStatus())
+                ? View.VISIBLE : View.GONE);
+        reviewButton.setVisibility(passenger && value.canReview()
+                ? View.VISIBLE : View.GONE);
+
+        if ("FINISHED".equals(value.getStatus())) {
+            String text = String.format(Locale.getDefault(),
+                    "Vožnja je plaćena. Cena: %.0f RSD", value.getPrice());
+            if (passenger && value.isAlreadyReviewed()) {
+                text += "\nOvu vožnju ste već ocenili.";
+            } else if (passenger && value.canReview()) {
+                text += "\nOcenu možete ostaviti do "
+                        + displayDateTime(value.getReviewDeadline()) + ".";
+            }
+            actionMessage.setText(text);
+            actionMessage.setVisibility(View.VISIBLE);
+        } else {
+            actionMessage.setVisibility(View.GONE);
+        }
+    }
+
+    private void confirmFinishRide(long rideId) {
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Završetak vožnje")
+                .setMessage("Potvrdite da su svi putnici izašli i da je vožnja plaćena u vozilu.")
+                .setNegativeButton("Odustani", null)
+                .setPositiveButton("Završi vožnju", (dialog, which) -> finishRide(rideId))
+                .show();
+    }
+
+    private void finishRide(long rideId) {
+        finishButton.setEnabled(false);
+        ApiClient.getApi().finishRide(session.getAuthorizationHeader(), rideId, false)
+                .enqueue(new Callback<>() {
+                    @Override public void onResponse(@NonNull Call<Void> call,
+                                                     @NonNull Response<Void> response) {
+                        if (!isAdded() || finishButton == null) return;
+                        finishButton.setEnabled(true);
+                        if (!response.isSuccessful()) {
+                            actionMessage.setText(errorMessage(response,
+                                    "Završetak vožnje nije uspeo"));
+                            actionMessage.setVisibility(View.VISIBLE);
+                            return;
+                        }
+                        Toast.makeText(requireContext(),
+                                "Vožnja je završena i evidentirana kao plaćena.",
+                                Toast.LENGTH_LONG).show();
+                        ((MainActivity) requireActivity()).navigateTo(R.id.nav_dashboard);
+                    }
+
+                    @Override public void onFailure(@NonNull Call<Void> call,
+                                                    @NonNull Throwable throwable) {
+                        if (!isAdded() || finishButton == null) return;
+                        finishButton.setEnabled(true);
+                        actionMessage.setText("Backend nije dostupan: " + throwable.getMessage());
+                        actionMessage.setVisibility(View.VISIBLE);
+                    }
+                });
+    }
+
+    private void showReviewDialog(long rideId) {
+        LinearLayout form = new LinearLayout(requireContext());
+        form.setOrientation(LinearLayout.VERTICAL);
+        int padding = dp(20);
+        form.setPadding(padding, 0, padding, 0);
+
+        TextView driverLabel = new TextView(requireContext());
+        driverLabel.setText("Ocena vozača");
+        form.addView(driverLabel);
+        RatingBar driverRating = ratingBar();
+        form.addView(driverRating);
+
+        TextView vehicleLabel = new TextView(requireContext());
+        vehicleLabel.setText("Ocena vozila");
+        form.addView(vehicleLabel);
+        RatingBar vehicleRating = ratingBar();
+        form.addView(vehicleRating);
+
+        EditText comment = new EditText(requireContext());
+        comment.setHint("Komentar (opciono, najviše 200 karaktera)");
+        comment.setFilters(new InputFilter[]{new InputFilter.LengthFilter(200)});
+        form.addView(comment);
+
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Oceni vožnju")
+                .setView(form)
+                .setNegativeButton("Kasnije", null)
+                .setPositiveButton("Sačuvaj", (dialog, which) -> submitReview(
+                        rideId, Math.round(driverRating.getRating()),
+                        Math.round(vehicleRating.getRating()),
+                        comment.getText().toString().trim()))
+                .show();
+    }
+
+    private RatingBar ratingBar() {
+        RatingBar ratingBar = new RatingBar(requireContext(), null,
+                android.R.attr.ratingBarStyleSmall);
+        ratingBar.setNumStars(5);
+        ratingBar.setStepSize(1f);
+        ratingBar.setRating(5f);
+        return ratingBar;
+    }
+
+    private void submitReview(long rideId, int driverRating, int vehicleRating,
+                              String comment) {
+        reviewButton.setEnabled(false);
+        ApiClient.getApi().reviewRide(session.getAuthorizationHeader(), rideId,
+                        new RideReviewRequest(driverRating, vehicleRating, comment))
+                .enqueue(new Callback<>() {
+                    @Override public void onResponse(@NonNull Call<Void> call,
+                                                     @NonNull Response<Void> response) {
+                        if (!isAdded() || reviewButton == null) return;
+                        reviewButton.setEnabled(true);
+                        if (!response.isSuccessful()) {
+                            actionMessage.setText(errorMessage(response,
+                                    "Ocenjivanje nije uspelo"));
+                            actionMessage.setVisibility(View.VISIBLE);
+                            return;
+                        }
+                        Toast.makeText(requireContext(), "Ocena je sačuvana.",
+                                Toast.LENGTH_SHORT).show();
+                        loadTracking();
+                    }
+
+                    @Override public void onFailure(@NonNull Call<Void> call,
+                                                    @NonNull Throwable throwable) {
+                        if (!isAdded() || reviewButton == null) return;
+                        reviewButton.setEnabled(true);
+                        actionMessage.setText("Backend nije dostupan: " + throwable.getMessage());
+                        actionMessage.setVisibility(View.VISIBLE);
+                    }
+                });
+    }
+
+    private static String errorMessage(Response<?> response, String fallback) {
+        try {
+            if (response.errorBody() != null) {
+                JsonObject json = JsonParser.parseString(
+                        response.errorBody().string()).getAsJsonObject();
+                if (json.has("detail")) return json.get("detail").getAsString();
+                if (json.has("message")) return json.get("message").getAsString();
+            }
+        } catch (Exception ignored) { }
+        return fallback + " (HTTP " + response.code() + ").";
+    }
+
+    private static String displayDateTime(String value) {
+        if (value == null || value.isBlank()) return "—";
+        String normalized = value.replace('T', ' ');
+        return normalized.length() > 16 ? normalized.substring(0, 16) : normalized;
     }
 
     private void renderRoute(List<LocationResponse> geometry) {
@@ -197,6 +372,10 @@ public class CurrentRideFragment extends Fragment {
         return icon;
     }
 
+    private int dp(int value) {
+        return Math.round(value * getResources().getDisplayMetrics().density);
+    }
+
     private void schedule() {
         handler.removeCallbacks(refresh);
         if (isResumed()) handler.postDelayed(refresh, REFRESH_MS);
@@ -232,6 +411,9 @@ public class CurrentRideFragment extends Fragment {
     @Override public void onDestroyView() {
         handler.removeCallbacks(refresh);
         map = null;
+        actionMessage = null;
+        finishButton = null;
+        reviewButton = null;
         super.onDestroyView();
     }
 }

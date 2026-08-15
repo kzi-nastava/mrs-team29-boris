@@ -10,7 +10,6 @@ import com.example.backendspringboot.repositories.RideRepository;
 import com.example.backendspringboot.services.interfaces.ReviewService;
 import jakarta.persistence.EntityNotFoundException;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
@@ -49,33 +48,36 @@ public class ReviewServiceImpl implements ReviewService {
     }
 
     @Override
-    public void createReview(ReviewRequestDTO dto) {
+    public void createReview(ReviewRequestDTO dto, Long authenticatedPassengerId) {
         // Find ride
         Ride ride = rideRepository.findById(dto.getRideId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
 
-        // Check if passenger participated
-        boolean participated = ride.getPassengers().stream()
-                .anyMatch(p -> p.getId().equals(dto.getPassengerId()));
-        if(!participated){
-            participated = ride.getRideCreator().getId().equals(dto.getPassengerId());
+        if (ride.getRideCreator() == null
+                || !ride.getRideCreator().getId().equals(authenticatedPassengerId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Samo putnik koji je poručio vožnju može da je oceni.");
         }
-        if (!participated) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You did not participate in this ride.");
+        if (ride.getStatus() != com.example.backendspringboot.model.RideStatus.FINISHED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Može se oceniti samo završena vožnja.");
         }
 
         // Already rated?
-        if (reviewRepository.existsByRideIdAndPassengerId(dto.getRideId(), dto.getPassengerId())) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "You already rated this ride.");
+        if (reviewRepository.existsByRideIdAndPassengerId(
+                dto.getRideId(), authenticatedPassengerId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Već ste ocenili ovu vožnju.");
         }
 
         // Time check
         if (ride.getEndTime() == null || LocalDateTime.now().isAfter(ride.getEndTime().plusHours(72))) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Review deadline has passed.");
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Rok od tri dana za ocenjivanje je istekao.");
         }
 
         // Save data
-        Passenger passenger = passengerRepository.findById(dto.getPassengerId())
+        Passenger passenger = passengerRepository.findById(authenticatedPassengerId)
                 .orElseThrow(() -> new EntityNotFoundException("Passenger not found"));
 
         Review review = new Review();

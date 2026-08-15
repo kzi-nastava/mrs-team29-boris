@@ -6,5 +6,5 @@ import java.util.List;
 
 public interface ReviewService {
     List<ReviewRequestDTO> getAll(long rideId);
-    void createReview(ReviewRequestDTO dto);
+    void createReview(ReviewRequestDTO dto, Long authenticatedPassengerId);
 }
