@@ -119,7 +119,8 @@ public class BackendSpringBootApplication {
 					d.setPassword(passwordEncoder.encode("driver123"));
 					d.setPhone("060123456" + i);
 					d.setGender(Gender.MALE);
-					d.setStatus(DriverStatus.ACTIVE);
+					// Slobodan demo vozač postaje vidljiv i dostupan tek nakon login-a.
+					d.setStatus(DriverStatus.INACTIVE);
 					d.setVehicle(v);
 					d.setAddress("Driver Street " + i);
 					driverRepository.save(d);
@@ -307,9 +308,12 @@ public class BackendSpringBootApplication {
 			if (existingRide.getStatus() == RideStatus.STARTED
 					&& existingRide.getRoute() != null
 					&& existingRide.getRoute().getDuration() == 600) {
+				existingRide.setDemoLoopingSimulation(true);
 				existingRide.setRideCreator(passenger);
 				existingRide.setPassengers(new ArrayList<>(List.of(passenger)));
 				rideRepository.save(existingRide);
+				driver.setStatus(DriverStatus.ACTIVE);
+				driverRepository.save(driver);
 			}
 			return;
 		}
@@ -357,11 +361,13 @@ public class BackendSpringBootApplication {
 		ride.setPricePerKmAtBooking(vehiclePrice.getPerKm());
 		ride.setDistanceKm(route.getDistance());
 		ride.setStatus(RideStatus.STARTED);
+		ride.setDemoLoopingSimulation(true);
 		ride.setScheduledTime(LocalDateTime.now());
 		ride.setStartTime(LocalDateTime.now());
 		ride = rideRepository.save(ride);
 
 		driver.setActiveRide(ride);
+		driver.setStatus(DriverStatus.ACTIVE);
 		driverRepository.save(driver);
 		driver.getVehicle().setBusy(true);
 		vehicleRepository.save(driver.getVehicle());

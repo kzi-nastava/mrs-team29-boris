@@ -7,6 +7,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.MenuItem;
 import android.widget.Toast;
 
 import androidx.activity.EdgeToEdge;
@@ -40,6 +41,7 @@ import com.example.mobilnaaplikacijatim29.ui.report.ReportsFragment;
 import com.example.mobilnaaplikacijatim29.ui.support.SupportChatFragment;
 import com.example.mobilnaaplikacijatim29.ui.support.SupportConversationsFragment;
 import com.example.mobilnaaplikacijatim29.ui.notifications.NotificationsFragment;
+import com.example.mobilnaaplikacijatim29.notifications.NotificationDeliveryTracker;
 import com.example.mobilnaaplikacijatim29.notifications.SystemNotificationHelper;
 import com.example.mobilnaaplikacijatim29.data.model.AppNotification;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
@@ -48,7 +50,10 @@ import retrofit2.Call;
 import retrofit2.Callback;
 import retrofit2.Response;
 
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 public class MainActivity extends AppCompatActivity {
     public static final String EXTRA_OPEN_NOTIFICATIONS = "open_notifications";
@@ -64,6 +69,8 @@ public class MainActivity extends AppCompatActivity {
     private final Runnable notificationRefresh = this::pollNotifications;
     private boolean notificationRequestInProgress;
     private Long pendingRideId;
+    private boolean dashboardActsAsBack;
+    private boolean ignoreNavigationSelection;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -88,6 +95,11 @@ public class MainActivity extends AppCompatActivity {
         }
         bottomNavigation = findViewById(R.id.bottom_navigation);
         bottomNavigation.setOnItemSelectedListener(item -> {
+            if (ignoreNavigationSelection) return true;
+            if (item.getItemId() == R.id.nav_dashboard && dashboardActsAsBack) {
+                navigateBack();
+                return false;
+            }
             if (item.getItemId() == R.id.nav_login && sessionManager.isLoggedIn()) {
                 requestLogout(message ->
                         Toast.makeText(this, message, Toast.LENGTH_LONG).show());
@@ -96,6 +108,13 @@ public class MainActivity extends AppCompatActivity {
             showDestination(item.getItemId(), null);
             return true;
         });
+        bottomNavigation.setOnItemReselectedListener(item -> {
+            if (item.getItemId() == R.id.nav_dashboard && dashboardActsAsBack) {
+                navigateBack();
+            }
+        });
+        getSupportFragmentManager().addOnBackStackChangedListener(
+                this::updateBackNavigationItem);
         configureNavigationForSession();
         scheduleNotificationPoll(0);
 
@@ -107,6 +126,7 @@ public class MainActivity extends AppCompatActivity {
                 showDestination(0, null);
             }
         }
+        bottomNavigation.post(this::updateBackNavigationItem);
 
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main), (v, insets) -> {
             Insets systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -224,6 +244,69 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    private void navigateBack() {
+        if (getSupportFragmentManager().getBackStackEntryCount() > 0) {
+            getSupportFragmentManager().popBackStack();
+            return;
+        }
+        navigateToRoleHome();
+    }
+
+    private void navigateToRoleHome() {
+        if (sessionManager.isLoggedIn()) {
+            showDestination(R.id.nav_dashboard, null);
+            selectNavigationItemSilently(R.id.nav_dashboard);
+        } else {
+            showDestination(0, null);
+            clearNavigationSelection();
+        }
+    }
+
+    private void updateBackNavigationItem() {
+        if (bottomNavigation == null || sessionManager == null) return;
+        Fragment current = getSupportFragmentManager()
+                .findFragmentById(R.id.fragment_container);
+        boolean home = isRoleHome(current);
+        MenuItem dashboard = bottomNavigation.getMenu().findItem(R.id.nav_dashboard);
+        dashboardActsAsBack = current != null && !home;
+        if (dashboardActsAsBack) {
+            dashboard.setVisible(true)
+                    .setTitle("Nazad")
+                    .setIcon(R.drawable.ic_nav_back);
+        } else {
+            boolean loggedIn = sessionManager.isLoggedIn();
+            dashboard.setVisible(loggedIn)
+                    .setTitle(roleHomeTitle())
+                    .setIcon(android.R.drawable.ic_menu_mapmode);
+            if (home) {
+                if (loggedIn) selectNavigationItemSilently(R.id.nav_dashboard);
+                else clearNavigationSelection();
+            }
+        }
+    }
+
+    private boolean isRoleHome(Fragment fragment) {
+        if (fragment == null) return false;
+        if (!sessionManager.isLoggedIn()) return fragment instanceof HomeFragment;
+        String role = sessionManager.getRole();
+        if ("admin".equalsIgnoreCase(role)) return fragment instanceof AdminDashboardFragment;
+        if ("driver".equalsIgnoreCase(role)) return fragment instanceof DriverDashboardFragment;
+        return fragment instanceof HomeFragment;
+    }
+
+    private String roleHomeTitle() {
+        if (!sessionManager.isLoggedIn()) return "Početna";
+        String role = sessionManager.getRole();
+        return "driver".equalsIgnoreCase(role) ? "Vozač"
+                : "admin".equalsIgnoreCase(role) ? "Admin" : "Početna";
+    }
+
+    private void selectNavigationItemSilently(int itemId) {
+        ignoreNavigationSelection = true;
+        bottomNavigation.setSelectedItemId(itemId);
+        ignoreNavigationSelection = false;
+    }
+
     private void clearNavigationSelection() {
         bottomNavigation.getMenu().setGroupCheckable(0, true, false);
         for (int i = 0; i < bottomNavigation.getMenu().size(); i++) {
@@ -278,9 +361,15 @@ public class MainActivity extends AppCompatActivity {
                     : new HomeFragment();
         }
 
-        getSupportFragmentManager()
-                .beginTransaction()
+        boolean roleHome = destinationId == R.id.nav_dashboard
+                || (destinationId == 0 && !sessionManager.isLoggedIn());
+        if (roleHome) {
+            getSupportFragmentManager().popBackStackImmediate(null,
+                    androidx.fragment.app.FragmentManager.POP_BACK_STACK_INCLUSIVE);
+        }
+        getSupportFragmentManager().beginTransaction()
                 .replace(R.id.fragment_container, fragment)
+                .runOnCommit(this::updateBackNavigationItem)
                 .commit();
     }
 
@@ -310,19 +399,24 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void deliverNewNotifications(List<AppNotification> values) {
-        String key = "last_notification_" + sessionManager.getUserId();
+        String key = "delivered_notifications_" + sessionManager.getUserId();
         android.content.SharedPreferences preferences = getSharedPreferences(
                 "notification_delivery", MODE_PRIVATE);
-        long lastDelivered = preferences.getLong(key, 0L);
-        long newest = lastDelivered;
-        for (int i = values.size() - 1; i >= 0; i--) {
-            AppNotification value = values.get(i);
-            if (value.getId() != null && value.getId() > lastDelivered) {
-                SystemNotificationHelper.show(this, value);
-                newest = Math.max(newest, value.getId());
+        Set<String> delivered = new HashSet<>(preferences.getStringSet(
+                key, Collections.emptySet()));
+        boolean changed = false;
+        for (AppNotification value : NotificationDeliveryTracker.pending(values, delivered)) {
+            if (SystemNotificationHelper.show(this, value)) {
+                delivered.add(NotificationDeliveryTracker.fingerprint(value));
+                changed = true;
             }
         }
-        if (newest > lastDelivered) preferences.edit().putLong(key, newest).apply();
+        if (changed) {
+            preferences.edit()
+                    .putStringSet(key, delivered)
+                    .remove("last_notification_" + sessionManager.getUserId())
+                    .apply();
+        }
     }
 
     private void scheduleNotificationPoll(long delayMs) {

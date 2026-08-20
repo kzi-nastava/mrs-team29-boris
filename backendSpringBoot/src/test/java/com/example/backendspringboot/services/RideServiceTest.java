@@ -15,6 +15,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.Optional;
+import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.ArgumentMatchers.any;
@@ -170,5 +171,22 @@ public class RideServiceTest {
 
         assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
         assertEquals(RideStatus.STARTED, ride.getStatus());
+    }
+
+    @Test
+    void assignedDriverCannotFinishBeforeReachingDestination() {
+        ride.getRoute().setDuration(10);
+        ride.setStartTime(LocalDateTime.now());
+        when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> rideService.finishRide(1L, "driver@example.com", 10, false));
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+        assertEquals("Vožnja može da se završi tek kada vozilo stigne na odredište.",
+                exception.getReason());
+        assertEquals(RideStatus.STARTED, ride.getStatus());
+        assertSame(ride, driver.getActiveRide());
+        assertTrue(vehicle.getBusy());
     }
 }

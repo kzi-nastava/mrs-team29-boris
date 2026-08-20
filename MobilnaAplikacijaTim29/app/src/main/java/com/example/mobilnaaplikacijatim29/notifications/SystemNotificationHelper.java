@@ -29,10 +29,10 @@ public final class SystemNotificationHelper {
         context.getSystemService(NotificationManager.class).createNotificationChannel(channel);
     }
 
-    public static void show(Context context, AppNotification value) {
+    public static boolean show(Context context, AppNotification value) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
                 && ActivityCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED) return;
+                != PackageManager.PERMISSION_GRANTED) return false;
         Intent intent = new Intent(context, MainActivity.class);
         intent.setFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         if (opensRide(value)) {
@@ -51,8 +51,16 @@ public final class SystemNotificationHelper {
                 .setPriority(NotificationCompat.PRIORITY_HIGH)
                 .setAutoCancel(true)
                 .setContentIntent(pending);
-        NotificationManagerCompat.from(context).notify(
-                value.getId() == null ? 1 : value.getId().intValue(), notification.build());
+        NotificationManagerCompat manager = NotificationManagerCompat.from(context);
+        if (!manager.areNotificationsEnabled()) return false;
+        NotificationChannel channel = context.getSystemService(NotificationManager.class)
+                .getNotificationChannel(CHANNEL_ID);
+        if (channel != null && channel.getImportance() == NotificationManager.IMPORTANCE_NONE) {
+            return false;
+        }
+        manager.notify(value.getId() == null ? 1 : value.getId().intValue(),
+                notification.build());
+        return true;
     }
 
     private static String title(String type) {
@@ -61,15 +69,16 @@ public final class SystemNotificationHelper {
         if ("RIDE_REJECTED".equals(type)) return "Vožnja nije prihvaćena";
         if ("RIDE_REMINDER".equals(type)) return "Podsetnik za vožnju";
         if ("LINKED_RIDE".equals(type)) return "Povezani ste sa vožnjom";
+        if ("RIDE_STARTED".equals(type)) return "Vožnja je započeta";
         if ("RIDE_FINISHED".equals(type)) return "Vožnja je završena";
         return "Click & Drive";
     }
 
-    private static boolean opensRide(AppNotification value) {
+    static boolean opensRide(AppNotification value) {
         if (value.getRideId() == null) return false;
         String type = value.getType();
         return "LINKED_RIDE".equals(type) || "RIDE_ACCEPTED".equals(type)
                 || "RIDE_REMINDER".equals(type) || "RIDE_FINISHED".equals(type)
-                || "NEW_RIDE".equals(type);
+                || "RIDE_STARTED".equals(type) || "NEW_RIDE".equals(type);
     }
 }

@@ -22,6 +22,7 @@ import java.util.Optional;
 import java.time.LocalDateTime;
 
 import static org.junit.jupiter.api.Assertions.assertDoesNotThrow;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -72,6 +73,7 @@ class RideTrackingAuthorizationTest {
         ride.setStatus(RideStatus.FINISHED);
         ride.setEndTime(LocalDateTime.now().minusHours(1));
         ride.setRoute(route);
+        ride.setStops(List.of(new Location(3L, 19.85, 45.25, "Stanica")));
         when(rideRepository.findById(9L)).thenReturn(Optional.of(ride));
 
         RideTrackingResponseDTO creatorResponse = service.getRideTracking(9L, creator);
@@ -79,6 +81,10 @@ class RideTrackingAuthorizationTest {
 
         assertTrue(creatorResponse.isCanReview());
         assertFalse(linkedResponse.isCanReview());
+        assertEquals("A", creatorResponse.getOrigin().getAddress());
+        assertEquals("B", creatorResponse.getDestination().getAddress());
+        assertEquals(1, creatorResponse.getStops().size());
+        assertEquals("Stanica", creatorResponse.getStops().get(0).getAddress());
 
         Review review = new Review();
         review.setPassenger(creator);

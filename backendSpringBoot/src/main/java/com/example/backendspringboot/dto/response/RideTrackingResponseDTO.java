@@ -19,6 +19,9 @@ public class RideTrackingResponseDTO {
     private String status;
     private double progressPercent;
     private List<LocationDTO> routeGeometry;
+    private LocationDTO origin;
+    private LocationDTO destination;
+    private List<LocationDTO> stops;
     private double price;
     private boolean canReview;
     private boolean alreadyReviewed;

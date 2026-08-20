@@ -154,7 +154,7 @@ public class CurrentRideFragment extends Fragment {
                 "Status: %s\nProcenjeno preostalo vreme: %d min\nNapredak: %.0f%%",
                 state, value.getEstimatedTimeInMinutes(), value.getProgressPercent()));
         progress.setProgress((int) Math.round(value.getProgressPercent()));
-        renderRoute(value.getRouteGeometry());
+        renderRoute(value);
         renderVehicle(value.getVehicleLocation());
         renderActions(value);
         if (!isFinished(value.getStatus())) schedule();
@@ -163,12 +163,18 @@ public class CurrentRideFragment extends Fragment {
     private void renderActions(RideTrackingResponse value) {
         boolean driver = "driver".equalsIgnoreCase(session.getRole());
         boolean passenger = "user".equalsIgnoreCase(session.getRole());
-        finishButton.setVisibility(driver && "STARTED".equals(value.getStatus())
+        boolean started = "STARTED".equals(value.getStatus());
+        boolean destinationReached = value.getProgressPercent() >= 99.9;
+        finishButton.setVisibility(driver && started && destinationReached
                 ? View.VISIBLE : View.GONE);
         reviewButton.setVisibility(passenger && value.canReview()
                 ? View.VISIBLE : View.GONE);
 
-        if ("FINISHED".equals(value.getStatus())) {
+        if (driver && started && !destinationReached) {
+            actionMessage.setText("Završetak vožnje biće dostupan kada vozilo stigne "
+                    + "na odredište.");
+            actionMessage.setVisibility(View.VISIBLE);
+        } else if ("FINISHED".equals(value.getStatus())) {
             String text = String.format(Locale.getDefault(),
                     "Vožnja je plaćena. Cena: %.0f RSD", value.getPrice());
             if (passenger && value.isAlreadyReviewed()) {
@@ -259,10 +265,14 @@ public class CurrentRideFragment extends Fragment {
 
     private RatingBar ratingBar() {
         RatingBar ratingBar = new RatingBar(requireContext(), null,
-                android.R.attr.ratingBarStyleSmall);
+                android.R.attr.ratingBarStyle);
+        ratingBar.setLayoutParams(new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.WRAP_CONTENT,
+                ViewGroup.LayoutParams.WRAP_CONTENT));
         ratingBar.setNumStars(5);
         ratingBar.setStepSize(1f);
         ratingBar.setRating(5f);
+        ratingBar.setIsIndicator(false);
         return ratingBar;
     }
 
@@ -315,7 +325,8 @@ public class CurrentRideFragment extends Fragment {
         return normalized.length() > 16 ? normalized.substring(0, 16) : normalized;
     }
 
-    private void renderRoute(List<LocationResponse> geometry) {
+    private void renderRoute(RideTrackingResponse value) {
+        List<LocationResponse> geometry = value.getRouteGeometry();
         if (routeLine != null || geometry.size() < 2) return;
         List<GeoPoint> points = new ArrayList<>();
         for (LocationResponse location : geometry) {
@@ -330,8 +341,28 @@ public class CurrentRideFragment extends Fragment {
         routeLine.setWidth(9f);
         routeLine.setTitle("Drumska ruta vožnje");
         map.getOverlays().add(routeLine);
-        map.getOverlays().add(marker(points.get(0), "Polazište"));
-        map.getOverlays().add(marker(points.get(points.size() - 1), "Odredište"));
+        Marker originMarker = marker(pointOrFallback(value.getOrigin(), points.get(0)),
+                locationTitle("Polazište", value.getOrigin()));
+        originMarker.setIcon(ContextCompat.getDrawable(requireContext(),
+                R.drawable.ic_route_origin));
+        map.getOverlays().add(originMarker);
+
+        for (int i = 0; i < value.getStops().size(); i++) {
+            LocationResponse stop = value.getStops().get(i);
+            GeoPoint stopPoint = point(stop);
+            if (stopPoint == null) continue;
+            Marker stopMarker = marker(stopPoint, locationTitle("Stanica " + (i + 1), stop));
+            stopMarker.setIcon(ContextCompat.getDrawable(requireContext(),
+                    R.drawable.ic_route_stop));
+            map.getOverlays().add(stopMarker);
+        }
+
+        Marker destinationMarker = marker(
+                pointOrFallback(value.getDestination(), points.get(points.size() - 1)),
+                locationTitle("Odredište", value.getDestination()));
+        destinationMarker.setIcon(ContextCompat.getDrawable(requireContext(),
+                R.drawable.ic_route_destination));
+        map.getOverlays().add(destinationMarker);
         if (!viewportInitialized) {
             viewportInitialized = true;
             map.post(() -> {
@@ -339,6 +370,23 @@ public class CurrentRideFragment extends Fragment {
                         BoundingBox.fromGeoPoints(points), true, 80);
             });
         }
+    }
+
+    private static GeoPoint pointOrFallback(LocationResponse location, GeoPoint fallback) {
+        GeoPoint point = point(location);
+        return point == null ? fallback : point;
+    }
+
+    private static GeoPoint point(LocationResponse location) {
+        if (location == null || location.getLatitude() == null
+                || location.getLongitude() == null) return null;
+        return new GeoPoint(location.getLatitude(), location.getLongitude());
+    }
+
+    private static String locationTitle(String label, LocationResponse location) {
+        if (location == null || location.getAddress() == null
+                || location.getAddress().isBlank()) return label;
+        return label + ": " + location.getAddress();
     }
 
     private void renderVehicle(LocationResponse location) {

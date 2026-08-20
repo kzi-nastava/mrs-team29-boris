@@ -18,6 +18,7 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.fragment.app.Fragment;
@@ -358,9 +359,12 @@ public class HomeFragment extends Fragment {
         double distance = roadDistanceKm;
         int duration = roadDurationMinutes;
         String[] types = {"STANDARD", "LUXURY", "VAN"};
+        String selectedVehicleType = types[vehicleType.getSelectedItemPosition()];
+        boolean babyRequested = babySwitch.isChecked();
+        boolean petRequested = petSwitch.isChecked();
         CreateRideRequest request = new CreateRideRequest(origin, destination,
-                new ArrayList<>(stops), emails, types[vehicleType.getSelectedItemPosition()],
-                scheduled.format(API_TIME), babySwitch.isChecked(), petSwitch.isChecked(),
+                new ArrayList<>(stops), emails, selectedVehicleType,
+                scheduled.format(API_TIME), babyRequested, petRequested,
                 duration, distance);
         submitButton.setEnabled(false);
         ApiClient.getApi().createRide(session.getAuthorizationHeader(), request)
@@ -370,26 +374,47 @@ public class HomeFragment extends Fragment {
                         if (!isAdded()) return;
                         submitButton.setEnabled(true);
                         if (!response.isSuccessful() || response.body() == null) {
-                            showBookingMessage(errorMessage(response), true);
+                            showBookingResult(false, errorMessage(response));
                             return;
                         }
                         RideBookingResponse ride = response.body();
                         if ("FAILED".equalsIgnoreCase(ride.getStatus())) {
-                            showBookingMessage("Trenutno nema dostupnih vozača. "
-                                    + "Obaveštenje je sačuvano.", true);
+                            String requirements = selectedVehicleType
+                                    + (babyRequested ? ", prevoz bebe" : "")
+                                    + (petRequested ? ", kućni ljubimac" : "");
+                            showBookingResult(false,
+                                    "Nema slobodnog vozača koji odgovara zahtevima: "
+                                            + requirements + ". Obaveštenje je sačuvano.");
                         } else {
-                            showBookingMessage(String.format(Locale.getDefault(),
+                            showBookingResult(true, String.format(Locale.getDefault(),
                                     "Vožnja #%d je prihvaćena. Cena: %.0f RSD. Vozač je obavešten.",
-                                    ride.getId(), ride.getPrice()), false);
+                                    ride.getId(), ride.getPrice()));
                         }
                     }
                     @Override public void onFailure(@NonNull Call<RideBookingResponse> call,
                                                     @NonNull Throwable throwable) {
                         if (!isAdded()) return;
                         submitButton.setEnabled(true);
-                        showBookingMessage("Backend nije dostupan: " + throwable.getMessage(), true);
+                        showBookingResult(false,
+                                "Backend nije dostupan: " + throwable.getMessage());
                     }
                 });
+    }
+
+    private void showBookingResult(boolean successful, String message) {
+        if (!isAdded()) return;
+        new AlertDialog.Builder(requireContext())
+                .setTitle(successful
+                        ? "Vožnja je uspešno poručena"
+                        : "Vožnja nije poručena")
+                .setMessage(message)
+                .setCancelable(false)
+                .setPositiveButton("U redu", (dialog, which) -> {
+                    if (isAdded()) {
+                        ((MainActivity) requireActivity()).navigateTo(R.id.nav_dashboard);
+                    }
+                })
+                .show();
     }
 
     private List<String> passengerEmails() {
@@ -496,9 +521,12 @@ public class HomeFragment extends Fragment {
                             .append(vehicles.size()).append("\n");
                     for (ActiveVehicleResponse vehicle : vehicles) {
                         LocationResponse location = vehicle.getCurrentLocation();
-                        text.append("• Vozilo #").append(vehicle.getId())
-                                .append(vehicle.isBusy() ? " — zauzeto" : " — slobodno");
-                        if (location != null && location.getAddress() != null) {
+                        text.append("• Vozilo #").append(vehicle.getId());
+                        if (!vehicle.isBusy()) {
+                            text.append(" — slobodno");
+                        }
+                        if (!vehicle.isBusy() && location != null
+                                && location.getAddress() != null) {
                             text.append(" — ").append(location.getAddress());
                         }
                         text.append("\n");
@@ -535,7 +563,7 @@ public class HomeFragment extends Fragment {
             marker.setPosition(position);
             marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
             marker.setTitle("Vozilo #" + vehicle.getId());
-            marker.setSnippet(vehicle.isBusy() ? "Zauzeto" : "Slobodno");
+            if (!vehicle.isBusy()) marker.setSnippet("Slobodno");
             marker.setIcon(createVehicleIcon(vehicle.isBusy()));
             vehicleMarkers.add(marker);
             mapView.getOverlays().add(marker);

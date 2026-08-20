@@ -81,6 +81,14 @@ public class UserServiceImpl implements UserService {
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.UNAUTHORIZED, "Invalid email or password"));
 
+        // Credentials must be checked before account state. Besides producing the
+        // correct login error, this avoids revealing whether a known email belongs
+        // to an account that still needs activation.
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new ResponseStatusException(
+                    HttpStatus.UNAUTHORIZED, "Invalid email or password");
+        }
+
         if (user instanceof Passenger passenger && !passenger.isActivated()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Account not activated. Check your email.");
         }
@@ -88,11 +96,6 @@ public class UserServiceImpl implements UserService {
         if (user instanceof Driver driver && driver.getStatus() == DriverStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                     "Driver registration is not completed");
-        }
-
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED, "Invalid email or password");
         }
 
         if (user instanceof Driver driver) {

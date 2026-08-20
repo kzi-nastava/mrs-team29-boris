@@ -26,4 +26,14 @@ class RideRouteGeometryTest {
         assertEquals(1.0, middle.getLongitude(), 0.001);
         assertEquals(0.0, middle.getLatitude(), 0.001);
     }
+
+    @Test
+    void demoRideMovesBackAndForthInsteadOfStoppingAtDestination() {
+        assertEquals(0.0, RideServiceImpl.loopingDemoProgress(0), 0.001);
+        assertEquals(0.5, RideServiceImpl.loopingDemoProgress(45), 0.001);
+        assertEquals(1.0, RideServiceImpl.loopingDemoProgress(90), 0.001);
+        assertEquals(0.5, RideServiceImpl.loopingDemoProgress(135), 0.001);
+        assertEquals(0.0, RideServiceImpl.loopingDemoProgress(180), 0.001);
+        assertEquals(0.5, RideServiceImpl.loopingDemoProgress(225), 0.001);
+    }
 }

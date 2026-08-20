@@ -10,6 +10,9 @@ public class RideTrackingResponse {
     private String status;
     private double progressPercent;
     private List<LocationResponse> routeGeometry;
+    private LocationResponse origin;
+    private LocationResponse destination;
+    private List<LocationResponse> stops;
     private double price;
     private boolean canReview;
     private boolean alreadyReviewed;
@@ -20,6 +23,11 @@ public class RideTrackingResponse {
     public int getEstimatedTimeInMinutes() { return estimatedTimeInMinutes; }
     public String getStatus() { return status; }
     public double getProgressPercent() { return progressPercent; }
+    public LocationResponse getOrigin() { return origin; }
+    public LocationResponse getDestination() { return destination; }
+    public List<LocationResponse> getStops() {
+        return stops == null ? Collections.emptyList() : stops;
+    }
     public double getPrice() { return price; }
     public boolean canReview() { return canReview; }
     public boolean isAlreadyReviewed() { return alreadyReviewed; }

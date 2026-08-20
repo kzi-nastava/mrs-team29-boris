@@ -51,6 +51,7 @@ public class RideServiceImpl implements RideService {
 
     //Other
     private static final double TRACKING_SIMULATION_SPEED = 10.0;
+    private static final double FINISH_PROGRESS_THRESHOLD = 0.999;
 
     // Ride creation
     @Override
@@ -150,7 +151,8 @@ public class RideServiceImpl implements RideService {
             ride.setStatus(RideStatus.FAILED); // later send notification
             rideRepository.save(ride);
             notificationService.notify(creator, ride, "RIDE_REJECTED",
-                    "Poručivanje vožnje nije uspelo: trenutno nema dostupnih vozača.",
+                    "Poručivanje vožnje nije uspelo: nema dostupnog vozača koji odgovara "
+                            + "izabranom tipu vozila i zahtevima prevoza.",
                     "ride:" + ride.getId() + ":rejected:" + creator.getId());
             // Map ride to response with status FAILED
             return new RideResponseDTO(
@@ -634,6 +636,9 @@ public class RideServiceImpl implements RideService {
                 ride.getStatus().name(),
                 progressPercent,
                 routeGeometry(ride.getRoute()),
+                locationDto(ride.getRoute().getOrigin()),
+                locationDto(ride.getRoute().getDestination()),
+                safe(ride.getStops()).stream().map(RideServiceImpl::locationDto).toList(),
                 ride.getPrice(),
                 canReview,
                 alreadyReviewed,
@@ -680,11 +685,23 @@ public class RideServiceImpl implements RideService {
                 LocalDateTime.now()
         ).getSeconds();
 
+        if (ride.isDemoLoopingSimulation()) {
+            return loopingDemoProgress(elapsedSeconds);
+        }
+
         double simulatedElapsedSeconds = elapsedSeconds * TRACKING_SIMULATION_SPEED;
         long totalSeconds = Math.max(1, durationMinutes * 60L);
 
         return Math.min(1.0, Math.max(0.0, simulatedElapsedSeconds / totalSeconds));
 
+    }
+
+    static double loopingDemoProgress(long elapsedSeconds) {
+        final long oneWaySeconds = 90L;
+        long offset = Math.floorMod(elapsedSeconds, oneWaySeconds * 2L);
+        return offset <= oneWaySeconds
+                ? offset / (double) oneWaySeconds
+                : (oneWaySeconds * 2L - offset) / (double) oneWaySeconds;
     }
 
     static RoutePoint pointAlongRoute(Route route, double progress) {
@@ -859,6 +876,11 @@ public class RideServiceImpl implements RideService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Samo započeta vožnja može da se završi.");
         }
+        if (calculateTrackingProgress(ride,
+                Math.max(1, ride.getRoute().getDuration())) < FINISH_PROGRESS_THRESHOLD) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Vožnja može da se završi tek kada vozilo stigne na odredište.");
+        }
 
         ride.setStatus(RideStatus.FINISHED);
         ride.setEndTime(LocalDateTime.now());
@@ -885,6 +907,10 @@ public class RideServiceImpl implements RideService {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Samo započeta vožnja može da se završi.");
         }
+        if (guestRideProgress(guestRide) < FINISH_PROGRESS_THRESHOLD) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Vožnja može da se završi tek kada vozilo stigne na odredište.");
+        }
 
         guestRide.setStatus(RideStatus.FINISHED);
         guestRide.setEndTime(LocalDateTime.now());
@@ -907,6 +933,16 @@ public class RideServiceImpl implements RideService {
         driverRepository.save(driver);
         vehicleRepository.save(vehicle);
         guestRideRepository.save(guestRide);
+    }
+
+    private static double guestRideProgress(GuestRide ride) {
+        if (ride.getStatus() != RideStatus.STARTED || ride.getStartTime() == null
+                || ride.getRoute() == null) return 0.0;
+        long elapsedSeconds = Math.max(0,
+                Duration.between(ride.getStartTime(), LocalDateTime.now()).getSeconds());
+        long totalSeconds = Math.max(1, ride.getRoute().getDuration() * 60L);
+        return Math.min(1.0,
+                elapsedSeconds * TRACKING_SIMULATION_SPEED / totalSeconds);
     }
 
     private static double finishDistance(double bookedDistance, Route route,

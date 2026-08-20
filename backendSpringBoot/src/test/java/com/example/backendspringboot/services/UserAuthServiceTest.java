@@ -7,6 +7,7 @@ import com.example.backendspringboot.dto.response.DriverStatusResponseDTO;
 import com.example.backendspringboot.dto.response.LoginResponseDTO;
 import com.example.backendspringboot.model.Driver;
 import com.example.backendspringboot.model.DriverStatus;
+import com.example.backendspringboot.model.Passenger;
 import com.example.backendspringboot.model.Ride;
 import com.example.backendspringboot.repositories.PassengerRepository;
 import com.example.backendspringboot.repositories.UserRepository;
@@ -97,6 +98,36 @@ class UserAuthServiceTest {
     }
 
     @Test
+    void wrongPasswordDoesNotClaimThatPassengerNeedsActivation() {
+        Passenger passenger = passenger(10L, false);
+        LoginRequestDTO request = loginRequest(passenger.getEmail(), "WrongPassword1");
+        when(userRepository.findByEmail(passenger.getEmail())).thenReturn(Optional.of(passenger));
+        when(passwordEncoder.matches(request.getPassword(), passenger.getPassword()))
+                .thenReturn(false);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> service.login(request));
+
+        assertEquals(HttpStatus.UNAUTHORIZED, exception.getStatusCode());
+        assertEquals("Invalid email or password", exception.getReason());
+    }
+
+    @Test
+    void correctPasswordForUnactivatedPassengerRequestsActivation() {
+        Passenger passenger = passenger(11L, false);
+        LoginRequestDTO request = loginRequest(passenger.getEmail(), "Password1");
+        when(userRepository.findByEmail(passenger.getEmail())).thenReturn(Optional.of(passenger));
+        when(passwordEncoder.matches(request.getPassword(), passenger.getPassword()))
+                .thenReturn(true);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> service.login(request));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
+        assertEquals("Account not activated. Check your email.", exception.getReason());
+    }
+
+    @Test
     void inactiveRequestDuringRideIsDeferred() {
         Driver driver = driver(7L, DriverStatus.ACTIVE);
         driver.setActiveRide(new Ride());
@@ -156,6 +187,15 @@ class UserAuthServiceTest {
         driver.setStatus(status);
         driver.setDeactivateAfterRide(false);
         return driver;
+    }
+
+    private Passenger passenger(long id, boolean activated) {
+        Passenger passenger = new Passenger();
+        passenger.setId(id);
+        passenger.setEmail("passenger" + id + "@demo.com");
+        passenger.setPassword("encoded-old-password");
+        passenger.setActivated(activated);
+        return passenger;
     }
 
     private LoginRequestDTO loginRequest(String email, String password) {

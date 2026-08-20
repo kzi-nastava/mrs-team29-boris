@@ -92,4 +92,8 @@ public class Ride {
 
     private boolean panicPressed;
 
+    // Development seed rides use a repeating movement so occupied demo vehicles
+    // remain visibly in motion for manual demonstrations.
+    private boolean demoLoopingSimulation;
+
 }

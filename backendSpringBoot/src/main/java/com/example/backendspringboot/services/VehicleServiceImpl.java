@@ -4,6 +4,7 @@ import com.example.backendspringboot.dto.LocationDTO;
 import com.example.backendspringboot.dto.response.ActiveVehicleResponseDTO;
 import com.example.backendspringboot.model.Vehicle;
 import com.example.backendspringboot.model.Driver;
+import com.example.backendspringboot.model.DriverStatus;
 import com.example.backendspringboot.dto.response.RideTrackingResponseDTO;
 import com.example.backendspringboot.repositories.DriverRepository;
 import com.example.backendspringboot.repositories.VehicleRepository;
@@ -36,10 +37,9 @@ public class VehicleServiceImpl implements VehicleService {
     @Override
     @Transactional(readOnly = true)
     public List<ActiveVehicleResponseDTO> getAllActiveVehicles() {
-        List<Vehicle> vehicles = vehicleRepository.findAll();
-
-        return vehicles.stream()
-                .filter(v -> v.getLocation() != null)
+        return driverRepository.findAllByStatus(DriverStatus.ACTIVE).stream()
+                .map(Driver::getVehicle)
+                .filter(v -> v != null && v.getLocation() != null)
                 .map(v -> new ActiveVehicleResponseDTO(
                         v.getId(),
                         getDisplayedLocation(v),
