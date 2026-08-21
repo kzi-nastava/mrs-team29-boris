@@ -177,7 +177,7 @@ public class BackendSpringBootApplication {
 
 			// ------------------ 5. PASSENGERS (SA OMILJENIM RUTAMA) ------------------
 			Passenger jovan;
-			Passenger pavle;
+			Passenger luka;
 
 			if (passengerRepository.count() == 0) {
 				jovan = new Passenger();
@@ -193,20 +193,20 @@ public class BackendSpringBootApplication {
 				jovan.setFavoriteRoutes(new ArrayList<>(List.of(routes.get(0), routes.get(2))));
 				jovan = passengerRepository.save(jovan);
 
-				pavle = new Passenger();
-				pavle.setName("Pavle");
-				pavle.setSurname("Maksimovic");
-				pavle.setEmail("makspavle@gmail.com");
-				pavle.setPassword(passwordEncoder.encode("pavle123"));
-				pavle.setActivated(true);
-				pavle.setPhone("069123456");
-				pavle.setGender(Gender.MALE);
-				pavle.setAddress("Passenger Street 2");
-				pavle.setFavoriteRoutes(new ArrayList<>(List.of(routes.get(1), routes.get(4), routes.get(5))));
-				pavle = passengerRepository.save(pavle);
+				luka = new Passenger();
+				luka.setName("Luka");
+				luka.setSurname("Lukic");
+				luka.setEmail("passenger2@demo.com");
+				luka.setPassword(passwordEncoder.encode("passenger2123"));
+				luka.setActivated(true);
+				luka.setPhone("069123456");
+				luka.setGender(Gender.MALE);
+				luka.setAddress("Passenger Street 2");
+				luka.setFavoriteRoutes(new ArrayList<>(List.of(routes.get(1), routes.get(4), routes.get(5))));
+				luka = passengerRepository.save(luka);
 			} else {
 				jovan = passengerRepository.findByEmail("passenger@demo.com").get();
-				pavle = passengerRepository.findByEmail("makspavle@gmail.com").get();
+				luka = passengerRepository.findByEmail("passenger2@demo.com").get();
 			}
 			Passenger ana = findOrCreateDemoPassenger(
 					passengerRepository, passwordEncoder,
@@ -221,9 +221,9 @@ public class BackendSpringBootApplication {
 			if (rideRepository.count() == 0) {
 				List<Driver> drivers = driverRepository.findAll();
 				Object[][] rideMatrix = {
-						{0, jovan, 0}, {0, pavle, 1}, {0, jovan, 2},
-						{1, pavle, 3}, {1, jovan, 4}, {1, pavle, 5},
-						{2, jovan, 0}, {2, pavle, 2}, {2, jovan, 4}
+						{0, jovan, 0}, {0, luka, 1}, {0, jovan, 2},
+						{1, luka, 3}, {1, jovan, 4}, {1, luka, 5},
+						{2, jovan, 0}, {2, luka, 2}, {2, jovan, 4}
 				};
 
 				for (int i = 0; i < rideMatrix.length; i++) {
