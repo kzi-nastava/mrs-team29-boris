@@ -52,6 +52,7 @@ class VehicleServiceTest {
                 .get(0);
 
         assertEquals(1L, result.getId());
+        assertEquals("Marko Driverovic", result.getDriverName());
         assertFalse(result.isBusy());
         assertEquals("Bulevar Kralja Petra I", result.getCurrentLocation().getAddress());
         assertEquals(45.2641, result.getCurrentLocation().getLatitude());
@@ -138,6 +139,8 @@ class VehicleServiceTest {
 
     private static Driver driver(Vehicle vehicle, DriverStatus status) {
         Driver driver = new Driver();
+        driver.setName("Marko");
+        driver.setSurname("Driverovic");
         driver.setStatus(status);
         driver.setVehicle(vehicle);
         return driver;

@@ -10,6 +10,7 @@ import lombok.Setter;
 @NoArgsConstructor @AllArgsConstructor
 public class ActiveVehicleResponseDTO {
     private Long id;
+    private String driverName;
     private LocationDTO currentLocation;
     private boolean busy; // true if busy
 }

@@ -126,6 +126,18 @@ public class BackendSpringBootApplication {
 					driverRepository.save(d);
 			}
 
+			// Dva slobodna demo konkurenta omogućavaju ručnu proveru izbora najbližeg
+			// između više vozača. Glavni driver@demo.com i dalje postaje aktivan tek
+			// kada se prijavi na fizičkom telefonu.
+			for (String competitorEmail : List.of("driver2@demo.com", "driver3@demo.com")) {
+				Driver demoCompetitor = driverRepository.findByEmail(competitorEmail).orElseThrow();
+				demoCompetitor.setStatus(DriverStatus.ACTIVE);
+				demoCompetitor.setDeactivateAfterRide(false);
+				demoCompetitor.getVehicle().setBusy(false);
+				vehicleRepository.save(demoCompetitor.getVehicle());
+				driverRepository.save(demoCompetitor);
+			}
+
 			// ------------------ 4. ROUTES (6 RUTA) ------------------
 			// Moramo ih imati spremne pre putnika da bismo izbegli Lazy grešku
 			List<Route> routes = new ArrayList<>();
@@ -262,7 +274,8 @@ public class BackendSpringBootApplication {
 					vp, locationRepository, routeRepository, rideRepository,
 					driverRepository, vehicleRepository, routingService);
 			System.out.println("Inicijalizacija uspešno završena "
-					+ "(9 istorijskih i 2 aktivne demo vožnje, 4 putnika).");
+					+ "(9 istorijskih, 2 aktivne demo vožnje, 2 slobodna demo konkurenta, "
+					+ "4 putnika).");
 		};
 	}
 

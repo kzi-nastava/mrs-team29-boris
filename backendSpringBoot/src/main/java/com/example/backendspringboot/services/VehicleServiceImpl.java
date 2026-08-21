@@ -38,14 +38,22 @@ public class VehicleServiceImpl implements VehicleService {
     @Transactional(readOnly = true)
     public List<ActiveVehicleResponseDTO> getAllActiveVehicles() {
         return driverRepository.findAllByStatus(DriverStatus.ACTIVE).stream()
-                .map(Driver::getVehicle)
-                .filter(v -> v != null && v.getLocation() != null)
-                .map(v -> new ActiveVehicleResponseDTO(
-                        v.getId(),
-                        getDisplayedLocation(v),
-                        Boolean.TRUE.equals(v.getBusy())
+                .filter(driver -> driver.getVehicle() != null
+                        && driver.getVehicle().getLocation() != null)
+                .map(driver -> new ActiveVehicleResponseDTO(
+                        driver.getVehicle().getId(),
+                        driverDisplayName(driver),
+                        getDisplayedLocation(driver.getVehicle()),
+                        Boolean.TRUE.equals(driver.getVehicle().getBusy())
                 ))
                 .collect(Collectors.toList());
+    }
+
+    private static String driverDisplayName(Driver driver) {
+        String name = driver.getName() == null ? "" : driver.getName().trim();
+        String surname = driver.getSurname() == null ? "" : driver.getSurname().trim();
+        String fullName = (name + " " + surname).trim();
+        return fullName.isEmpty() ? "Nepoznat vozač" : fullName;
     }
 
     private LocationDTO getDisplayedLocation(Vehicle vehicle) {

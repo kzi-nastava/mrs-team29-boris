@@ -7,6 +7,7 @@ import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.TextUtils;
 import android.util.Patterns;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
@@ -51,6 +52,7 @@ import org.osmdroid.views.MapView;
 import org.osmdroid.views.overlay.MapEventsOverlay;
 import org.osmdroid.views.overlay.Marker;
 import org.osmdroid.views.overlay.Polyline;
+import org.osmdroid.views.overlay.infowindow.MarkerInfoWindow;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -531,7 +533,8 @@ public class HomeFragment extends Fragment {
                             .append(vehicles.size()).append("\n");
                     for (ActiveVehicleResponse vehicle : vehicles) {
                         LocationResponse location = vehicle.getCurrentLocation();
-                        text.append("• Vozilo #").append(vehicle.getId());
+                        text.append("• Vozilo #").append(vehicle.getId())
+                                .append(" — ").append(driverName(vehicle));
                         if (!vehicle.isBusy()) {
                             text.append(" — slobodno");
                         }
@@ -564,6 +567,8 @@ public class HomeFragment extends Fragment {
         mapView.getOverlays().removeAll(vehicleMarkers);
         vehicleMarkers.clear();
         List<GeoPoint> positions = new ArrayList<>();
+        MarkerInfoWindow vehicleInfoWindow = new MarkerInfoWindow(
+                R.layout.vehicle_marker_info_window, mapView);
         for (ActiveVehicleResponse vehicle : vehicles) {
             LocationResponse location = vehicle.getCurrentLocation();
             if (location == null || location.getLatitude() == null || location.getLongitude() == null) continue;
@@ -573,7 +578,10 @@ public class HomeFragment extends Fragment {
             marker.setPosition(position);
             marker.setAnchor(Marker.ANCHOR_CENTER, Marker.ANCHOR_BOTTOM);
             marker.setTitle("Vozilo #" + vehicle.getId());
-            if (!vehicle.isBusy()) marker.setSnippet("Slobodno");
+            marker.setSnippet("<b>Vozač:</b> " + TextUtils.htmlEncode(driverName(vehicle))
+                    + "<br>"
+                    + (vehicle.isBusy() ? "Zauzeto" : "Slobodno"));
+            marker.setInfoWindow(vehicleInfoWindow);
             marker.setIcon(createVehicleIcon(vehicle.isBusy()));
             vehicleMarkers.add(marker);
             mapView.getOverlays().add(marker);
@@ -591,6 +599,11 @@ public class HomeFragment extends Fragment {
             }
         }
         mapView.invalidate();
+    }
+
+    private static String driverName(ActiveVehicleResponse vehicle) {
+        String value = vehicle.getDriverName();
+        return value == null || value.isBlank() ? "Nepoznat vozač" : value;
     }
 
     private Drawable createVehicleIcon(boolean busy) {
