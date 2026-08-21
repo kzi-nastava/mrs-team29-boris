@@ -507,7 +507,7 @@ public class RideServiceImpl implements RideService {
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.NOT_FOUND, "Vožnja nije pronađena."));
             Driver driver = assertAssignedDriver(guestRide.getDriver(), driverEmail);
-            assertRideCanStart(guestRide.getStatus(), driver);
+            assertRideCanStart(guestRide.getStatus(), driver, guestRide.getScheduledTime());
             guestRide.setStatus(RideStatus.STARTED);
             guestRide.setStartTime(LocalDateTime.now());
             guestRideRepository.save(guestRide);
@@ -520,7 +520,7 @@ public class RideServiceImpl implements RideService {
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.NOT_FOUND, "Vožnja nije pronađena."));
             Driver driver = assertAssignedDriver(ride.getDriver(), driverEmail);
-            assertRideCanStart(ride.getStatus(), driver);
+            assertRideCanStart(ride.getStatus(), driver, ride.getScheduledTime());
             ride.setStatus(RideStatus.STARTED);
             ride.setStartTime(LocalDateTime.now());
             rideRepository.save(ride);
@@ -545,10 +545,15 @@ public class RideServiceImpl implements RideService {
         return assignedDriver;
     }
 
-    private void assertRideCanStart(RideStatus status, Driver driver) {
+    private void assertRideCanStart(RideStatus status, Driver driver,
+                                    LocalDateTime scheduledTime) {
         if (status != RideStatus.SCHEDULED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT,
                     "Samo zakazana vožnja može da se započne.");
+        }
+        if (scheduledTime != null && LocalDateTime.now().isBefore(scheduledTime)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Zakazana vožnja ne može da počne pre zakazanog vremena.");
         }
         if (driver.getActiveRide() != null
                 || driver.getVehicle() == null
@@ -1116,6 +1121,7 @@ public class RideServiceImpl implements RideService {
     @Override
     public Page<ScheduledRideResponseDTO> getDriverScheduledRides(Long driverId, int page, int size) {
         Pageable pageable = PageRequest.of(page - 1, size); // 0-based page
+        LocalDateTime responseTime = LocalDateTime.now();
 
         List<Ride> rides = rideRepository.findAllByDriverId(driverId).stream()
                 .filter(r -> r.getStatus() == RideStatus.SCHEDULED)
@@ -1132,6 +1138,7 @@ public class RideServiceImpl implements RideService {
                     r.getRoute().getOrigin().getAddress(),
                     r.getRoute().getDestination().getAddress(),
                     r.getScheduledTime(),
+                    secondsUntilStart(r.getScheduledTime(), responseTime),
                     false,
                     allRidePassengers(r).stream().map(passenger ->
                             new RidePassengerResponseDTO(
@@ -1147,6 +1154,7 @@ public class RideServiceImpl implements RideService {
                     gr.getRoute().getOrigin().getAddress(),
                     gr.getRoute().getDestination().getAddress(),
                     gr.getScheduledTime(),
+                    secondsUntilStart(gr.getScheduledTime(), responseTime),
                     true,
                     List.of()
             ));
@@ -1159,6 +1167,12 @@ public class RideServiceImpl implements RideService {
         List<ScheduledRideResponseDTO> pagedList = allRides.subList(start, end);
 
         return new PageImpl<>(pagedList, pageable, allRides.size());
+    }
+
+    static long secondsUntilStart(LocalDateTime scheduledTime, LocalDateTime responseTime) {
+        if (scheduledTime == null || !scheduledTime.isAfter(responseTime)) return 0L;
+        long remainingMillis = Duration.between(responseTime, scheduledTime).toMillis();
+        return (remainingMillis + 999L) / 1000L;
     }
 
     private static List<Passenger> allRidePassengers(Ride ride) {

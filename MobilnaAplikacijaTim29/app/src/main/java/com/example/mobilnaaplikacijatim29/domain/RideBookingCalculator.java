@@ -40,6 +40,11 @@ public final class RideBookingCalculator {
                 && !scheduledTime.isAfter(now.plusHours(5));
     }
 
+    public static LocalDateTime requestedStart(LocalDateTime now, boolean scheduledForLater,
+                                               LocalDateTime selectedTime) {
+        return scheduledForLater ? selectedTime : now;
+    }
+
     private static double haversine(BookingLocation first, BookingLocation second) {
         double lat1 = Math.toRadians(first.getLatitude());
         double lat2 = Math.toRadians(second.getLatitude());

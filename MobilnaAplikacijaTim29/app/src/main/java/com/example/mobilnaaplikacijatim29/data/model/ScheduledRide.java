@@ -8,6 +8,7 @@ public class ScheduledRide {
     private String origin;
     private String destination;
     private String scheduledTime;
+    private Long secondsUntilStart;
     private boolean guest;
     private List<RidePassenger> passengers;
 
@@ -15,6 +16,7 @@ public class ScheduledRide {
     public String getOrigin() { return origin; }
     public String getDestination() { return destination; }
     public String getScheduledTime() { return scheduledTime; }
+    public Long getSecondsUntilStart() { return secondsUntilStart; }
     public boolean isGuest() { return guest; }
     public List<RidePassenger> getPassengers() {
         return passengers == null ? Collections.emptyList() : passengers;

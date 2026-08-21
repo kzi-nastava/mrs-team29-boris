@@ -1,6 +1,7 @@
 package com.example.mobilnaaplikacijatim29.ui.driver;
 
 import android.os.Bundle;
+import android.os.SystemClock;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -23,12 +24,16 @@ import com.example.mobilnaaplikacijatim29.data.model.RidePassenger;
 import com.example.mobilnaaplikacijatim29.data.model.ScheduledRide;
 import com.example.mobilnaaplikacijatim29.data.model.StartRideRequest;
 import com.example.mobilnaaplikacijatim29.data.session.SessionManager;
+import com.example.mobilnaaplikacijatim29.domain.RideStartCountdown;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 
 import java.util.List;
+import java.time.Duration;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeParseException;
 
 import retrofit2.Call;
 import retrofit2.Callback;
@@ -140,6 +145,15 @@ public class DriverDashboardFragment extends Fragment {
                 com.google.android.material.R.style.TextAppearance_Material3_BodyLarge);
         content.addView(details);
 
+        TextView countdown = new TextView(requireContext());
+        countdown.setTextAppearance(
+                com.google.android.material.R.style.TextAppearance_Material3_TitleMedium);
+        LinearLayout.LayoutParams countdownParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        countdownParams.setMargins(0, dp(10), 0, 0);
+        countdown.setLayoutParams(countdownParams);
+        content.addView(countdown);
+
         MaterialButton startButton = new MaterialButton(requireContext());
         startButton.setText("Započni vožnju");
         LinearLayout.LayoutParams buttonParams = new LinearLayout.LayoutParams(
@@ -150,6 +164,55 @@ public class DriverDashboardFragment extends Fragment {
         content.addView(startButton);
         card.addView(content);
         assignedRidesContainer.addView(card);
+        configureStartAvailability(startButton, countdown, ride);
+    }
+
+    private void configureStartAvailability(MaterialButton button, TextView countdown,
+                                            ScheduledRide ride) {
+        Long remainingSeconds = resolveRemainingSeconds(ride);
+        if (remainingSeconds == null) {
+            button.setEnabled(false);
+            countdown.setText("Početak za: vreme nije dostupno");
+            return;
+        }
+        if (RideStartCountdown.canStart(remainingSeconds)) {
+            button.setEnabled(true);
+            countdown.setText("Zakazano vreme je stiglo — vožnja može da počne.");
+            return;
+        }
+
+        button.setEnabled(false);
+        long deadline = SystemClock.elapsedRealtime() + remainingSeconds * 1000L;
+        Runnable tick = new Runnable() {
+            @Override
+            public void run() {
+                if (!isAdded() || !button.isAttachedToWindow()) return;
+                long remainingMillis = deadline - SystemClock.elapsedRealtime();
+                long seconds = Math.max(0L, (remainingMillis + 999L) / 1000L);
+                countdown.setText("Početak za: " + RideStartCountdown.format(seconds));
+                if (RideStartCountdown.canStart(seconds)) {
+                    countdown.setText("Zakazano vreme je stiglo — vožnja može da počne.");
+                    button.setEnabled(true);
+                    return;
+                }
+                button.postDelayed(this, Math.min(1000L, remainingMillis));
+            }
+        };
+        button.post(tick);
+    }
+
+    private Long resolveRemainingSeconds(ScheduledRide ride) {
+        if (ride.getSecondsUntilStart() != null) {
+            return Math.max(0L, ride.getSecondsUntilStart());
+        }
+        try {
+            LocalDateTime scheduled = LocalDateTime.parse(ride.getScheduledTime());
+            long remainingMillis = Duration.between(LocalDateTime.now(), scheduled).toMillis();
+            if (remainingMillis <= 0) return 0L;
+            return (remainingMillis + 999L) / 1000L;
+        } catch (DateTimeParseException | NullPointerException exception) {
+            return null;
+        }
     }
 
     private void confirmStartRide(ScheduledRide ride, MaterialButton button) {

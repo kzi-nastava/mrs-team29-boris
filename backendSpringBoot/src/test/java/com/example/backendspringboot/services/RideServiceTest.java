@@ -120,6 +120,7 @@ public class RideServiceTest {
         creator.setId(20L);
         ride.setRideCreator(creator);
         ride.setStatus(RideStatus.SCHEDULED);
+        ride.setScheduledTime(LocalDateTime.now().minusSeconds(1));
         driver.setActiveRide(null);
         vehicle.setBusy(false);
         when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
@@ -160,6 +161,34 @@ public class RideServiceTest {
                 () -> rideService.startRide(1L, false, "driver@example.com"));
 
         assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+    }
+
+    @Test
+    void scheduledRideCannotStartBeforeScheduledTime() {
+        ride.setStatus(RideStatus.SCHEDULED);
+        ride.setScheduledTime(LocalDateTime.now().plusSeconds(60));
+        driver.setActiveRide(null);
+        vehicle.setBusy(false);
+        when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> rideService.startRide(1L, false, "driver@example.com"));
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+        assertEquals("Zakazana vožnja ne može da počne pre zakazanog vremena.",
+                exception.getReason());
+        assertEquals(RideStatus.SCHEDULED, ride.getStatus());
+        assertNull(ride.getStartTime());
+    }
+
+    @Test
+    void scheduledRideCountdownUsesServerTimeAndRoundsUp() {
+        LocalDateTime responseTime = LocalDateTime.of(2026, 8, 25, 12, 0, 0);
+
+        assertEquals(70L, RideServiceImpl.secondsUntilStart(
+                responseTime.plusSeconds(69).plusNanos(1_000_000L), responseTime));
+        assertEquals(0L, RideServiceImpl.secondsUntilStart(
+                responseTime.minusSeconds(1), responseTime));
     }
 
     @Test

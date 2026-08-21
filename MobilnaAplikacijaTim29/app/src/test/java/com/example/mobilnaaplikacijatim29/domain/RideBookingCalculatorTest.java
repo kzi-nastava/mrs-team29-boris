@@ -47,6 +47,15 @@ public class RideBookingCalculatorTest {
         assertFalse(RideBookingCalculator.isAllowedSchedule(now, now.plusHours(5).plusSeconds(1)));
     }
 
+    @Test
+    public void immediateRideStartsNowWhileScheduledRideUsesSelectedTime() {
+        LocalDateTime now = LocalDateTime.of(2026, 8, 25, 10, 0);
+        LocalDateTime selected = now.plusSeconds(70);
+
+        assertEquals(now, RideBookingCalculator.requestedStart(now, false, selected));
+        assertEquals(selected, RideBookingCalculator.requestedStart(now, true, selected));
+    }
+
     private BookingLocation point(double longitude, double latitude) {
         return new BookingLocation(longitude, latitude, "test");
     }

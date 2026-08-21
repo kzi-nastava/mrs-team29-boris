@@ -16,6 +16,7 @@ public class ScheduledRideResponseDTO {
     private String origin;
     private String destination;
     private LocalDateTime scheduledTime;
+    private Long secondsUntilStart;
     private boolean guest;
     private List<RidePassengerResponseDTO> passengers;
 }

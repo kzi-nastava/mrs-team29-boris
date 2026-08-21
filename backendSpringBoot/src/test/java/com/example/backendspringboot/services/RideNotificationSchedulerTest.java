@@ -32,9 +32,30 @@ class RideNotificationSchedulerTest {
         scheduler.checkUpcomingRides();
 
         verify(notifications).notify(eq(creator), eq(ride), eq("RIDE_REMINDER"),
-                contains("15 minuta"), eq("ride:8:reminder:15:1"));
+                contains("15 minuta"), eq("ride:8:reminder:900:1"));
         verify(notifications).notify(eq(linked), eq(ride), eq("RIDE_REMINDER"),
-                contains("15 minuta"), eq("ride:8:reminder:15:2"));
+                contains("15 minuta"), eq("ride:8:reminder:900:2"));
+    }
+
+    @Test
+    void demoReminderUsesSecondsAndDoesNotRequireExactBoundary() {
+        RideRepository rideRepository = mock(RideRepository.class);
+        AppNotificationService notifications = mock(AppNotificationService.class);
+        RideNotificationScheduler scheduler = new RideNotificationScheduler(
+                rideRepository, notifications);
+        scheduler.useReminderThresholdsForTest("60,30,20,10");
+        Passenger creator = passenger(1L);
+        Ride ride = new Ride();
+        ride.setId(9L);
+        ride.setStatus(RideStatus.SCHEDULED);
+        ride.setScheduledTime(LocalDateTime.now().plusSeconds(57));
+        ride.setRideCreator(creator);
+        when(rideRepository.findAllByStatus(RideStatus.SCHEDULED)).thenReturn(List.of(ride));
+
+        scheduler.checkUpcomingRides();
+
+        verify(notifications).notify(eq(creator), eq(ride), eq("RIDE_REMINDER"),
+                contains("60 sekundi"), eq("ride:9:reminder:60:1"));
     }
 
     private Passenger passenger(long id) {

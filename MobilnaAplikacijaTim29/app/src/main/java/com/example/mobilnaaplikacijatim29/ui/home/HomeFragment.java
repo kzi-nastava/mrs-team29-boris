@@ -152,6 +152,8 @@ public class HomeFragment extends Fragment {
         if (!passenger) sessionStatus.setText("Niste prijavljeni.");
         view.findViewById(R.id.ride_booking_section)
                 .setVisibility(passenger ? View.VISIBLE : View.GONE);
+        view.findViewById(R.id.passenger_reports_button)
+                .setVisibility(passenger ? View.VISIBLE : View.GONE);
         if (passenger) setupBooking(view);
     }
 
@@ -191,6 +193,13 @@ public class HomeFragment extends Fragment {
             if (!checked) selectedTime = null;
         });
         pickTimeButton.setOnClickListener(v -> pickDateTime());
+        view.findViewById(R.id.booking_demo_schedule).setOnClickListener(v -> {
+            selectedTime = LocalDateTime.now().plusSeconds(70);
+            scheduleSwitch.setChecked(true);
+            ((TextView) pickTimeButton).setText("Demo zakazano: "
+                    + selectedTime.format(DateTimeFormatter.ofPattern("HH:mm:ss")));
+            showBookingMessage("Zakazaćete vožnju za 70 minuta.", false);
+        });
         submitButton.setOnClickListener(v -> submitRide());
         submitButton.setEnabled(false);
         vehicleType.setOnItemSelectedListener(new android.widget.AdapterView.OnItemSelectedListener() {
@@ -345,7 +354,8 @@ public class HomeFragment extends Fragment {
             return;
         }
         LocalDateTime now = LocalDateTime.now();
-        LocalDateTime scheduled = scheduleSwitch.isChecked() ? selectedTime : now.plusSeconds(30);
+        LocalDateTime scheduled = RideBookingCalculator.requestedStart(
+                now, scheduleSwitch.isChecked(), selectedTime);
         if (scheduled == null) {
             showBookingMessage("Izaberi vreme zakazane vožnje.", true);
             return;

@@ -38,6 +38,15 @@
                 android:contentDescription="Mapa aktivnih vozila" />
         </com.google.android.material.card.MaterialCardView>
 
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/passenger_reports_button"
+            style="@style/Widget.Material3.Button.OutlinedButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Izveštaji vožnji"
+            android:visibility="gone" />
+
         <TextView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -94,26 +103,38 @@
                     android:id="@+id/booking_set_origin"
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="48dp"
                     android:layout_weight="1"
+                    android:maxLines="1"
+                    android:minWidth="0dp"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
                     android:text="Polazište" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/booking_add_stop"
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="48dp"
                     android:layout_marginStart="6dp"
                     android:layout_weight="1"
-                    android:text="+ Stanica" />
+                    android:maxLines="1"
+                    android:minWidth="0dp"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
+                    android:text="Stanica" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/booking_set_destination"
                     style="@style/Widget.Material3.Button.OutlinedButton"
                     android:layout_width="0dp"
-                    android:layout_height="wrap_content"
+                    android:layout_height="48dp"
                     android:layout_marginStart="6dp"
                     android:layout_weight="1"
+                    android:maxLines="1"
+                    android:minWidth="0dp"
+                    android:paddingStart="4dp"
+                    android:paddingEnd="4dp"
                     android:text="Odredište" />
             </LinearLayout>
 
@@ -181,6 +202,14 @@
                 android:text="Izaberi datum i vreme"
                 android:visibility="gone" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/booking_demo_schedule"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Zakaži za najpopularnije vreme – 70 min" />
+
             <TextView
                 android:id="@+id/booking_estimate"
                 android:layout_width="match_parent"
@@ -202,14 +231,6 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"
                 android:text="Poruči vožnju" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/passenger_reports_button"
-                style="@style/Widget.Material3.Button.OutlinedButton"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="8dp"
-                android:text="Istorija i izveštaji vožnji" />
         </LinearLayout>
     </LinearLayout>
 </ScrollView>
