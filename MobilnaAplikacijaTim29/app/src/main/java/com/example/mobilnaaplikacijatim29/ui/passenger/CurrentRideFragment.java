@@ -6,6 +6,7 @@ import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.text.InputFilter;
+import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
@@ -28,6 +29,7 @@ import com.example.mobilnaaplikacijatim29.MainActivity;
 import com.example.mobilnaaplikacijatim29.R;
 import com.example.mobilnaaplikacijatim29.data.api.ApiClient;
 import com.example.mobilnaaplikacijatim29.data.model.LocationResponse;
+import com.example.mobilnaaplikacijatim29.data.model.InconsistencyReportRequest;
 import com.example.mobilnaaplikacijatim29.data.model.RideReviewRequest;
 import com.example.mobilnaaplikacijatim29.data.model.RideTrackingResponse;
 import com.example.mobilnaaplikacijatim29.data.session.SessionManager;
@@ -72,6 +74,7 @@ public class CurrentRideFragment extends Fragment {
     private TextView actionMessage;
     private MaterialButton finishButton;
     private MaterialButton reviewButton;
+    private MaterialButton reportButton;
     private Marker vehicleMarker;
     private Polyline routeLine;
     private SessionManager session;
@@ -103,6 +106,7 @@ public class CurrentRideFragment extends Fragment {
         actionMessage = view.findViewById(R.id.current_ride_action_message);
         finishButton = view.findViewById(R.id.current_ride_finish_button);
         reviewButton = view.findViewById(R.id.current_ride_review_button);
+        reportButton = view.findViewById(R.id.current_ride_report_button);
         long rideId = requireArguments().getLong(ARG_RIDE_ID);
         title.setText("Vožnja #" + rideId);
         map.setTileSource(OPEN_STREET_MAP);
@@ -115,6 +119,7 @@ public class CurrentRideFragment extends Fragment {
         });
         finishButton.setOnClickListener(v -> confirmFinishRide(rideId));
         reviewButton.setOnClickListener(v -> showReviewDialog(rideId));
+        reportButton.setOnClickListener(v -> showInconsistencyDialog(rideId));
     }
 
     private void loadTracking() {
@@ -169,6 +174,8 @@ public class CurrentRideFragment extends Fragment {
                 ? View.VISIBLE : View.GONE);
         reviewButton.setVisibility(passenger && value.canReview()
                 ? View.VISIBLE : View.GONE);
+        reportButton.setVisibility(passenger && started && !value.isInconsistencyReported()
+                ? View.VISIBLE : View.GONE);
 
         if (driver && started && !destinationReached) {
             actionMessage.setText("Završetak vožnje biće dostupan kada vozilo stigne "
@@ -188,6 +195,73 @@ public class CurrentRideFragment extends Fragment {
         } else {
             actionMessage.setVisibility(View.GONE);
         }
+    }
+
+    private void showInconsistencyDialog(long rideId) {
+        EditText reason = new EditText(requireContext());
+        reason.setHint("Opišite zbog čega smatrate da vozač ide neadekvatnim putem");
+        reason.setGravity(Gravity.TOP | Gravity.START);
+        reason.setMinLines(3);
+        reason.setFilters(new InputFilter[]{new InputFilter.LengthFilter(500)});
+        int padding = dp(20);
+        LinearLayout form = new LinearLayout(requireContext());
+        form.setPadding(padding, 0, padding, 0);
+        form.addView(reason, new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+
+        AlertDialog dialog = new AlertDialog.Builder(requireContext())
+                .setTitle("Prijava nekonzistentnosti")
+                .setView(form)
+                .setNegativeButton("Odustani", null)
+                .setPositiveButton("Pošalji", null)
+                .create();
+        dialog.setOnShowListener(ignored -> dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+                .setOnClickListener(v -> {
+                    String value = reason.getText().toString().trim();
+                    if (value.isEmpty()) {
+                        reason.setError("Unesite opis nekonzistentnosti.");
+                        return;
+                    }
+                    dialog.dismiss();
+                    submitInconsistencyReport(rideId, value);
+                }));
+        dialog.show();
+    }
+
+    private void submitInconsistencyReport(long rideId, String reason) {
+        reportButton.setEnabled(false);
+        ApiClient.getApi().reportInconsistency(session.getAuthorizationHeader(), rideId,
+                        new InconsistencyReportRequest(reason))
+                .enqueue(new Callback<>() {
+                    @Override public void onResponse(@NonNull Call<Void> call,
+                                                     @NonNull Response<Void> response) {
+                        if (!isAdded() || reportButton == null) return;
+                        if (!response.isSuccessful()) {
+                            if (response.code() == 409) {
+                                reportButton.setVisibility(View.GONE);
+                            } else {
+                                reportButton.setEnabled(true);
+                            }
+                            actionMessage.setText(errorMessage(response,
+                                    "Prijava nekonzistentnosti nije uspela"));
+                            actionMessage.setVisibility(View.VISIBLE);
+                            return;
+                        }
+                        reportButton.setVisibility(View.GONE);
+                        Toast.makeText(requireContext(),
+                                "Prijava nekonzistentnosti je sačuvana.",
+                                Toast.LENGTH_LONG).show();
+                    }
+
+                    @Override public void onFailure(@NonNull Call<Void> call,
+                                                    @NonNull Throwable throwable) {
+                        if (!isAdded() || reportButton == null) return;
+                        reportButton.setEnabled(true);
+                        actionMessage.setText("Backend nije dostupan: "
+                                + throwable.getMessage());
+                        actionMessage.setVisibility(View.VISIBLE);
+                    }
+                });
     }
 
     private void confirmFinishRide(long rideId) {
@@ -462,6 +536,7 @@ public class CurrentRideFragment extends Fragment {
         actionMessage = null;
         finishButton = null;
         reviewButton = null;
+        reportButton = null;
         super.onDestroyView();
     }
 }

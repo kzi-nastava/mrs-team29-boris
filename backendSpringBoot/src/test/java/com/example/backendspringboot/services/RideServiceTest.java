@@ -2,6 +2,8 @@ package com.example.backendspringboot.services;
 
 import com.example.backendspringboot.dto.LocationDTO;
 import com.example.backendspringboot.dto.request.RideStopRequestDTO;
+import com.example.backendspringboot.dto.request.InconsistencyReportRequestDTO;
+import com.example.backendspringboot.dto.response.InconsistencyReportResponseDTO;
 import com.example.backendspringboot.model.*;
 import com.example.backendspringboot.repositories.*;
 import com.example.backendspringboot.services.interfaces.RideService;
@@ -41,6 +43,12 @@ public class RideServiceTest {
 
     @Mock
     private AppNotificationService notificationService;
+
+    @Mock
+    private PassengerRepository passengerRepository;
+
+    @Mock
+    private InconsistencyReportRepository inconsistencyReportRepository;
 
     @InjectMocks
     private RideServiceImpl rideService;
@@ -217,5 +225,74 @@ public class RideServiceTest {
         assertEquals(RideStatus.STARTED, ride.getStatus());
         assertSame(ride, driver.getActiveRide());
         assertTrue(vehicle.getBusy());
+    }
+
+    @Test
+    void linkedPassengerCanReportInconsistencyDuringRide() {
+        Passenger creator = passenger(20L, "creator@example.com");
+        Passenger linked = passenger(21L, "linked@example.com");
+        ride.setRideCreator(creator);
+        ride.setPassengers(java.util.List.of(linked));
+        when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+        when(passengerRepository.findByEmail(linked.getEmail())).thenReturn(Optional.of(linked));
+        when(inconsistencyReportRepository.save(any(InconsistencyReport.class)))
+                .thenAnswer(invocation -> {
+                    InconsistencyReport report = invocation.getArgument(0);
+                    report.setId(50L);
+                    return report;
+                });
+
+        InconsistencyReportResponseDTO result = rideService.reportInconsistency(1L,
+                new InconsistencyReportRequestDTO("  Vozač je skrenuo sa rute.  "),
+                linked.getEmail());
+
+        assertEquals(50L, result.getId());
+        assertEquals("Vozač je skrenuo sa rute.", result.getNote());
+        assertEquals(linked.getEmail(), result.getPassengerEmail());
+        assertEquals(1L, result.getRideId());
+        verify(inconsistencyReportRepository).save(any(InconsistencyReport.class));
+    }
+
+    @Test
+    void unrelatedPassengerCannotReportInconsistency() {
+        Passenger creator = passenger(20L, "creator@example.com");
+        ride.setRideCreator(creator);
+        ride.setPassengers(java.util.List.of());
+        when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> rideService.reportInconsistency(1L,
+                        new InconsistencyReportRequestDTO("Neadekvatna ruta"),
+                        "outsider@example.com"));
+
+        assertEquals(HttpStatus.FORBIDDEN, exception.getStatusCode());
+    }
+
+    @Test
+    void passengerCannotReportInconsistencyTwiceForSameRide() {
+        Passenger creator = passenger(20L, "creator@example.com");
+        ride.setRideCreator(creator);
+        ride.setPassengers(java.util.List.of());
+        when(rideRepository.findById(1L)).thenReturn(Optional.of(ride));
+        when(passengerRepository.findByEmail(creator.getEmail()))
+                .thenReturn(Optional.of(creator));
+        when(inconsistencyReportRepository.existsByRideIdAndPassengerId(1L, 20L))
+                .thenReturn(true);
+
+        ResponseStatusException exception = assertThrows(ResponseStatusException.class,
+                () -> rideService.reportInconsistency(1L,
+                        new InconsistencyReportRequestDTO("Ponovljena prijava"),
+                        creator.getEmail()));
+
+        assertEquals(HttpStatus.CONFLICT, exception.getStatusCode());
+        assertEquals("Već ste prijavili nekonzistentnost za ovu vožnju.",
+                exception.getReason());
+    }
+
+    private static Passenger passenger(long id, String email) {
+        Passenger passenger = new Passenger();
+        passenger.setId(id);
+        passenger.setEmail(email);
+        return passenger;
     }
 }

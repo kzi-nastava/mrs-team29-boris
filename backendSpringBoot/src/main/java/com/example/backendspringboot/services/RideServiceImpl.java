@@ -633,6 +633,9 @@ public class RideServiceImpl implements RideService {
                 && !alreadyReviewed
                 && reviewDeadline != null
                 && !LocalDateTime.now().isAfter(reviewDeadline);
+        boolean inconsistencyReported = requester instanceof Passenger passenger
+                && inconsistencyReportRepository.existsByRideIdAndPassengerId(
+                        ride.getId(), passenger.getId());
 
         return new RideTrackingResponseDTO(
                 ride.getId(),
@@ -647,7 +650,8 @@ public class RideServiceImpl implements RideService {
                 ride.getPrice(),
                 canReview,
                 alreadyReviewed,
-                reviewDeadline
+                reviewDeadline,
+                inconsistencyReported
         );
     }
 
@@ -1099,11 +1103,18 @@ public class RideServiceImpl implements RideService {
 
         // report creation
         InconsistencyReport report = new InconsistencyReport();
-        report.setNote(dto.getReason());
+        report.setNote(dto.getReason().trim());
         report.setCreatedAt(LocalDateTime.now());
         report.setRide(ride);
         // set Passenger
-        Passenger passenger = passengerRepository.findByEmail(passengerEmail).get();
+        Passenger passenger = passengerRepository.findByEmail(passengerEmail)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Putnik nije pronađen."));
+        if (inconsistencyReportRepository.existsByRideIdAndPassengerId(
+                rideId, passenger.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Već ste prijavili nekonzistentnost za ovu vožnju.");
+        }
         report.setPassenger(passenger);
 
         inconsistencyReportRepository.save(report);

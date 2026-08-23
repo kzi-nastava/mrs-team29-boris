@@ -6,6 +6,9 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
+@Table(uniqueConstraints = @UniqueConstraint(
+        name = "uk_inconsistency_report_ride_passenger",
+        columnNames = {"ride_id", "passenger_id"}))
 @Data
 @NoArgsConstructor
 @AllArgsConstructor

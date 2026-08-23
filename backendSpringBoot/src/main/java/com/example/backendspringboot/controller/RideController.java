@@ -171,7 +171,6 @@ public class RideController {
             Authentication authentication) {
         Passenger passenger = (Passenger) authentication.getPrincipal();
         String passengerEmail = passenger.getEmail();
-        System.out.println("passenger email: " + passengerEmail);
 
         return ResponseEntity.ok(rideService.reportInconsistency(id, dto, passengerEmail));
     }

@@ -26,4 +26,5 @@ public class RideTrackingResponseDTO {
     private boolean canReview;
     private boolean alreadyReviewed;
     private LocalDateTime reviewDeadline;
+    private boolean inconsistencyReported;
 }

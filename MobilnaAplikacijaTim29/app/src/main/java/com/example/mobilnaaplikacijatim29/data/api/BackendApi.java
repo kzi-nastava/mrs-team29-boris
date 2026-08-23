@@ -52,6 +52,7 @@ import com.example.mobilnaaplikacijatim29.data.model.PageResponse;
 import com.example.mobilnaaplikacijatim29.data.model.ScheduledRide;
 import com.example.mobilnaaplikacijatim29.data.model.StartRideRequest;
 import com.example.mobilnaaplikacijatim29.data.model.RideReviewRequest;
+import com.example.mobilnaaplikacijatim29.data.model.InconsistencyReportRequest;
 
 public interface BackendApi {
 
@@ -96,6 +97,12 @@ public interface BackendApi {
             @Header("Authorization") String authorization,
             @Path("id") long rideId,
             @Body RideReviewRequest request);
+
+    @POST("api/rides/{id}/inconsistency-report")
+    Call<Void> reportInconsistency(
+            @Header("Authorization") String authorization,
+            @Path("id") long rideId,
+            @Body InconsistencyReportRequest request);
 
     @GET("api/chat/support/messages")
     Call<List<SupportMessage>> getSupportMessages(
