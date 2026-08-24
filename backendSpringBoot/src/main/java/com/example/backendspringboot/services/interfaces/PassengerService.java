@@ -10,6 +10,7 @@ import java.util.List;
 
 public interface PassengerService {
     Page<RouteFromFavoritesResponseDTO> getFavoriteRoutesForPassenger(Long passengerId, Pageable pageable);
+    RouteFromFavoritesResponseDTO addRideRouteToFavorites(Long passengerId, Long rideId);
     void removeFromFavoriteRoutes(Long passengerId, Long routeId);
     List<UserProfileResponseDTO> getAllPassengers();
     List<PassengerRideHistoryResponseDTO> getPassengerRideHistory(Long passengerId);

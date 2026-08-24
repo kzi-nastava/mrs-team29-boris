@@ -18,6 +18,8 @@ public class RideTrackingResponse {
     private boolean alreadyReviewed;
     private String reviewDeadline;
     private boolean inconsistencyReported;
+    private Long routeId;
+    private boolean favoriteRoute;
 
     public Long getRideId() { return rideId; }
     public LocationResponse getVehicleLocation() { return vehicleLocation; }
@@ -34,6 +36,8 @@ public class RideTrackingResponse {
     public boolean isAlreadyReviewed() { return alreadyReviewed; }
     public String getReviewDeadline() { return reviewDeadline; }
     public boolean isInconsistencyReported() { return inconsistencyReported; }
+    public Long getRouteId() { return routeId; }
+    public boolean isFavoriteRoute() { return favoriteRoute; }
     public List<LocationResponse> getRouteGeometry() {
         return routeGeometry == null ? Collections.emptyList() : routeGeometry;
     }

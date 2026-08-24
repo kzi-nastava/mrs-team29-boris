@@ -112,6 +112,8 @@ public class RideServiceImpl implements RideService {
         destination.setAddress(request.getDestination().getAddress());
         locationRepository.save(destination);
 
+        List<Location> rideStops = createStops(request.getStops());
+
         // Create route
         Route route = new Route();
         route.setOrigin(origin);
@@ -119,6 +121,7 @@ public class RideServiceImpl implements RideService {
         route.setDistance(routing.distanceKm());
         route.setDuration(routing.durationMinutes());
         route.setGeometry(new ArrayList<>(routing.geometry()));
+        route.setStops(rideStops);
         routeRepository.save(route);
 
         // Find suitable driver for ride
@@ -130,7 +133,7 @@ public class RideServiceImpl implements RideService {
         Ride ride = new Ride();
         ride.setStatus(RideStatus.CREATED);
         ride.setScheduledTime(request.getScheduledTime());
-        ride.setStops(createStops(request.getStops()));
+        ride.setStops(rideStops);
         ride.setRoute(route);
         ride.setBabyFriendly(request.isBabyFriendly());
         ride.setPetFriendly(request.isPetFriendly());
@@ -591,7 +594,14 @@ public class RideServiceImpl implements RideService {
         Ride ride = rideRepository.findById(rideId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Ride not found"));
 
-        if (requester != null) assertCanTrackRide(ride, requester);
+        // The principal is loaded by the JWT filter before this transaction and is
+        // therefore detached here. Reload it so authorization and lazy passenger
+        // relations are evaluated against one managed, current database entity.
+        User managedRequester = requester == null ? null : userRepository.findById(requester.getId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.UNAUTHORIZED, "Authenticated user no longer exists"));
+
+        if (managedRequester != null) assertCanTrackRide(ride, managedRequester);
 
         if (ride.getRoute() == null ||
                 ride.getRoute().getOrigin() == null ||
@@ -620,7 +630,7 @@ public class RideServiceImpl implements RideService {
 
         double progressPercent = Math.round(progress * 10000.0) / 100.0;
 
-        boolean isCreator = requester instanceof Passenger passenger
+        boolean isCreator = managedRequester instanceof Passenger passenger
                 && ride.getRideCreator() != null
                 && ride.getRideCreator().getId().equals(passenger.getId());
         boolean alreadyReviewed = isCreator && safe(ride.getReviews()).stream()
@@ -633,9 +643,13 @@ public class RideServiceImpl implements RideService {
                 && !alreadyReviewed
                 && reviewDeadline != null
                 && !LocalDateTime.now().isAfter(reviewDeadline);
-        boolean inconsistencyReported = requester instanceof Passenger passenger
+        boolean inconsistencyReported = managedRequester instanceof Passenger passenger
                 && inconsistencyReportRepository.existsByRideIdAndPassengerId(
                         ride.getId(), passenger.getId());
+        boolean favoriteRoute = managedRequester instanceof Passenger passenger
+                && passenger.getFavoriteRoutes() != null
+                && passenger.getFavoriteRoutes().stream()
+                        .anyMatch(route -> route.getId().equals(ride.getRoute().getId()));
 
         return new RideTrackingResponseDTO(
                 ride.getId(),
@@ -651,7 +665,9 @@ public class RideServiceImpl implements RideService {
                 canReview,
                 alreadyReviewed,
                 reviewDeadline,
-                inconsistencyReported
+                inconsistencyReported,
+                ride.getRoute().getId(),
+                favoriteRoute
         );
     }
 
@@ -666,15 +682,23 @@ public class RideServiceImpl implements RideService {
 
     private void assertCanTrackRide(Ride ride, User requester) {
         if (requester instanceof Administrator) return;
-        if (requester instanceof Driver driver && ride.getDriver() != null
-                && ride.getDriver().getId().equals(driver.getId())) return;
-        if (requester instanceof Passenger passenger) {
-            if (ride.getRideCreator() != null
-                    && ride.getRideCreator().getId().equals(passenger.getId())) return;
-            boolean linked = safe(ride.getPassengers()).stream()
-                    .anyMatch(value -> value.getId().equals(passenger.getId()));
-            if (linked) return;
+        if (requester == null || requester.getId() == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Nemate pristup praćenju ove vožnje");
         }
+
+        // User IDs are global across the joined User inheritance hierarchy. Do
+        // not depend on the concrete Java subclass here: an authenticated JPA
+        // principal can be represented by a Hibernate proxy of User.
+        if (ride.getDriver() != null
+                && ride.getDriver().getId().equals(requester.getId())) return;
+        if (ride.getRideCreator() != null
+                && ride.getRideCreator().getId().equals(requester.getId())) return;
+        if (safe(ride.getPassengers()).stream()
+                .anyMatch(passenger -> passenger.getId().equals(requester.getId()))) return;
+        if (rideRepository.existsRideParticipant(
+                ride.getId(), requester.getId())) return;
+
         throw new ResponseStatusException(HttpStatus.FORBIDDEN,
                 "Nemate pristup praćenju ove vožnje");
     }

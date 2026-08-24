@@ -5,6 +5,7 @@ import lombok.Getter;
 import lombok.Setter;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.List;
 
 @Getter
@@ -20,7 +21,7 @@ public class Passenger extends User {
             inverseJoinColumns = @JoinColumn(name = "route_id")
     )
     // ManyToMany znaci da ce se napraviti posebna tabela sa id-jem putnika i rute koja mu je omiljena
-    private List<Route> favoriteRoutes;
+    private List<Route> favoriteRoutes = new ArrayList<>();
 
     @Column(nullable = false)
     private boolean activated = false;

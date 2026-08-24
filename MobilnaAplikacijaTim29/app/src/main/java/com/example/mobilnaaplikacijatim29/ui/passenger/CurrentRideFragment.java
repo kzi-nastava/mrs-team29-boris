@@ -30,6 +30,7 @@ import com.example.mobilnaaplikacijatim29.R;
 import com.example.mobilnaaplikacijatim29.data.api.ApiClient;
 import com.example.mobilnaaplikacijatim29.data.model.LocationResponse;
 import com.example.mobilnaaplikacijatim29.data.model.InconsistencyReportRequest;
+import com.example.mobilnaaplikacijatim29.data.model.FavoriteRoute;
 import com.example.mobilnaaplikacijatim29.data.model.RideReviewRequest;
 import com.example.mobilnaaplikacijatim29.data.model.RideTrackingResponse;
 import com.example.mobilnaaplikacijatim29.data.session.SessionManager;
@@ -75,6 +76,7 @@ public class CurrentRideFragment extends Fragment {
     private MaterialButton finishButton;
     private MaterialButton reviewButton;
     private MaterialButton reportButton;
+    private MaterialButton favoriteButton;
     private Marker vehicleMarker;
     private Polyline routeLine;
     private SessionManager session;
@@ -107,6 +109,7 @@ public class CurrentRideFragment extends Fragment {
         finishButton = view.findViewById(R.id.current_ride_finish_button);
         reviewButton = view.findViewById(R.id.current_ride_review_button);
         reportButton = view.findViewById(R.id.current_ride_report_button);
+        favoriteButton = view.findViewById(R.id.current_ride_favorite_button);
         long rideId = requireArguments().getLong(ARG_RIDE_ID);
         title.setText("Vožnja #" + rideId);
         map.setTileSource(OPEN_STREET_MAP);
@@ -120,6 +123,7 @@ public class CurrentRideFragment extends Fragment {
         finishButton.setOnClickListener(v -> confirmFinishRide(rideId));
         reviewButton.setOnClickListener(v -> showReviewDialog(rideId));
         reportButton.setOnClickListener(v -> showInconsistencyDialog(rideId));
+        favoriteButton.setOnClickListener(v -> toggleFavoriteRoute(rideId));
     }
 
     private void loadTracking() {
@@ -133,12 +137,16 @@ public class CurrentRideFragment extends Fragment {
                         requestInProgress = false;
                         if (!isAdded()) return;
                         if (!response.isSuccessful() || response.body() == null) {
+                            map.setVisibility(View.GONE);
+                            progress.setVisibility(View.GONE);
                             status.setText(response.code() == 403
                                     ? "Nemate pristup ovoj vožnji."
                                     : "Praćenje nije dostupno (HTTP " + response.code() + ").");
                             schedule();
                             return;
                         }
+                        map.setVisibility(View.VISIBLE);
+                        progress.setVisibility(View.VISIBLE);
                         render(response.body());
                     }
 
@@ -146,6 +154,8 @@ public class CurrentRideFragment extends Fragment {
                                                     @NonNull Throwable throwable) {
                         requestInProgress = false;
                         if (isAdded()) {
+                            map.setVisibility(View.GONE);
+                            progress.setVisibility(View.GONE);
                             status.setText("Backend nije dostupan: " + throwable.getMessage());
                             schedule();
                         }
@@ -176,6 +186,14 @@ public class CurrentRideFragment extends Fragment {
                 ? View.VISIBLE : View.GONE);
         reportButton.setVisibility(passenger && started && !value.isInconsistencyReported()
                 ? View.VISIBLE : View.GONE);
+        boolean completed = "FINISHED".equals(value.getStatus())
+                || "STOPPED".equals(value.getStatus());
+        favoriteButton.setVisibility(passenger && completed && value.getRouteId() != null
+                ? View.VISIBLE : View.GONE);
+        favoriteButton.setTag(value.isFavoriteRoute());
+        favoriteButton.setTag(R.id.current_ride_favorite_button, value.getRouteId());
+        favoriteButton.setText(value.isFavoriteRoute()
+                ? "Ukloni rutu iz omiljenih" : "Dodaj rutu u omiljene");
 
         if (driver && started && !destinationReached) {
             actionMessage.setText("Završetak vožnje biće dostupan kada vozilo stigne "
@@ -226,6 +244,86 @@ public class CurrentRideFragment extends Fragment {
                     submitInconsistencyReport(rideId, value);
                 }));
         dialog.show();
+    }
+
+    private void toggleFavoriteRoute(long rideId) {
+        boolean favorite = Boolean.TRUE.equals(favoriteButton.getTag());
+        if (favorite) removeFavoriteRoute();
+        else addFavoriteRoute(rideId);
+    }
+
+    private void addFavoriteRoute(long rideId) {
+        favoriteButton.setEnabled(false);
+        ApiClient.getApi().addFavoriteRoute(session.getAuthorizationHeader(), rideId)
+                .enqueue(new Callback<>() {
+                    @Override public void onResponse(@NonNull Call<FavoriteRoute> call,
+                                                     @NonNull Response<FavoriteRoute> response) {
+                        if (!isAdded() || favoriteButton == null) return;
+                        favoriteButton.setEnabled(true);
+                        if (!response.isSuccessful()) {
+                            showFavoriteError(response, "Ruta nije dodata u omiljene");
+                            return;
+                        }
+                        updateFavoriteButton(true);
+                        Toast.makeText(requireContext(), "Ruta je dodata u omiljene.",
+                                Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override public void onFailure(@NonNull Call<FavoriteRoute> call,
+                                                    @NonNull Throwable throwable) {
+                        favoriteFailure(throwable);
+                    }
+                });
+    }
+
+    private void removeFavoriteRoute() {
+        Long routeId = null;
+        Object value = favoriteButton.getTag(R.id.current_ride_favorite_button);
+        if (value instanceof Long) routeId = (Long) value;
+        if (routeId == null) {
+            loadTracking();
+            return;
+        }
+        favoriteButton.setEnabled(false);
+        ApiClient.getApi().removeFavoriteRoute(session.getAuthorizationHeader(), routeId)
+                .enqueue(new Callback<>() {
+                    @Override public void onResponse(@NonNull Call<Void> call,
+                                                     @NonNull Response<Void> response) {
+                        if (!isAdded() || favoriteButton == null) return;
+                        favoriteButton.setEnabled(true);
+                        if (!response.isSuccessful()) {
+                            showFavoriteError(response, "Ruta nije uklonjena iz omiljenih");
+                            return;
+                        }
+                        updateFavoriteButton(false);
+                        Toast.makeText(requireContext(), "Ruta je uklonjena iz omiljenih.",
+                                Toast.LENGTH_SHORT).show();
+                    }
+
+                    @Override public void onFailure(@NonNull Call<Void> call,
+                                                    @NonNull Throwable throwable) {
+                        favoriteFailure(throwable);
+                    }
+                });
+    }
+
+    private void updateFavoriteButton(boolean favorite) {
+        favoriteButton.setTag(favorite);
+        favoriteButton.setText(favorite
+                ? "Ukloni rutu iz omiljenih" : "Dodaj rutu u omiljene");
+    }
+
+    private void showFavoriteError(Response<?> response, String fallback) {
+        favoriteButton.setEnabled(true);
+        actionMessage.setText(errorMessage(response, fallback));
+        actionMessage.setVisibility(View.VISIBLE);
+    }
+
+    private void favoriteFailure(Throwable throwable) {
+        if (!isAdded() || favoriteButton == null) return;
+        favoriteButton.setEnabled(true);
+        actionMessage.setText("Backend nije dostupan: " + throwable.getMessage());
+        actionMessage.setVisibility(View.VISIBLE);
     }
 
     private void submitInconsistencyReport(long rideId, String reason) {
@@ -537,6 +635,7 @@ public class CurrentRideFragment extends Fragment {
         finishButton = null;
         reviewButton = null;
         reportButton = null;
+        favoriteButton = null;
         super.onDestroyView();
     }
 }

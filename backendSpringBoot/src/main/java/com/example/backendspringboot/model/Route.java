@@ -35,4 +35,13 @@ public class Route {
     @CollectionTable(name = "route_geometry", joinColumns = @JoinColumn(name = "route_id"))
     @OrderColumn(name = "point_order")
     private List<RoutePoint> geometry = new ArrayList<>();
+
+    @ManyToMany
+    @JoinTable(
+            name = "route_stops",
+            joinColumns = @JoinColumn(name = "route_id"),
+            inverseJoinColumns = @JoinColumn(name = "location_id")
+    )
+    @OrderColumn(name = "stop_order")
+    private List<Location> stops = new ArrayList<>();
 }

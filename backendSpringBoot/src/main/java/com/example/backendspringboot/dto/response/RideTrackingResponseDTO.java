@@ -27,4 +27,6 @@ public class RideTrackingResponseDTO {
     private boolean alreadyReviewed;
     private LocalDateTime reviewDeadline;
     private boolean inconsistencyReported;
+    private Long routeId;
+    private boolean favoriteRoute;
 }

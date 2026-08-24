@@ -29,6 +29,16 @@ public interface RideRepository extends JpaRepository<Ride, Long> {
             """)
     boolean existsStartedRideForPassenger(@Param("passengerId") Long passengerId);
 
+    @Query("""
+            SELECT CASE WHEN COUNT(DISTINCT r.id) > 0 THEN true ELSE false END
+            FROM Ride r
+            LEFT JOIN r.passengers p
+            WHERE r.id = :rideId
+              AND (r.rideCreator.id = :passengerId OR p.id = :passengerId)
+            """)
+    boolean existsRideParticipant(@Param("rideId") Long rideId,
+                                  @Param("passengerId") Long passengerId);
+
     @Query("SELECT DISTINCT r FROM Ride r LEFT JOIN r.passengers p " +
             "WHERE (p.id = :passengerId OR r.rideCreator.id = :passengerId) " +
             "AND r.status = 'FINISHED' " +

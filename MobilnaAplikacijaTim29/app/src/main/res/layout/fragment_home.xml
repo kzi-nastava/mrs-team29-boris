@@ -85,6 +85,14 @@
                 android:textAppearance="?attr/textAppearanceHeadlineSmall"
                 android:textStyle="bold" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/booking_favorites_button"
+                style="@style/Widget.Material3.Button.OutlinedButton"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Izaberi omiljenu rutu" />
+
             <TextView
                 android:id="@+id/booking_instruction"
                 android:layout_width="match_parent"

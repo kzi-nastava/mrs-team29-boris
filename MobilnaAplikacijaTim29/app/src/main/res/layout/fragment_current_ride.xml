@@ -60,6 +60,15 @@
         android:visibility="gone" />
 
     <com.google.android.material.button.MaterialButton
+        android:id="@+id/current_ride_favorite_button"
+        style="@style/Widget.Material3.Button.OutlinedButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:text="Dodaj rutu u omiljene"
+        android:visibility="gone" />
+
+    <com.google.android.material.button.MaterialButton
         android:id="@+id/current_ride_finish_button"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"

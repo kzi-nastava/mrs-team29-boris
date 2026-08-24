@@ -37,36 +37,97 @@ public class PassengerServiceImpl implements PassengerService {
         Passenger passenger = passengerRepository.findById(passengerId).orElseThrow(() -> new RuntimeException("Passenger not found"));
 
         // Get his favorite routes, if he has any
-        List<Route> favoriteRoutes = passenger.getFavoriteRoutes();
+        List<Route> favoriteRoutes = safeFavoriteRoutes(passenger);
 
         int start = (int) pageable.getOffset();
         int end = Math.min(start + pageable.getPageSize(), favoriteRoutes.size());
-        List<Route> pageContent = favoriteRoutes.subList(start, end);
+        List<Route> pageContent = start >= favoriteRoutes.size()
+                ? List.of() : favoriteRoutes.subList(start, end);
 
         // Map models to ResponseDTO and send to frontend
         List<RouteFromFavoritesResponseDTO> dtos = pageContent.stream()
-                .map(route -> new RouteFromFavoritesResponseDTO(
-                        route.getId(),
-                        new LocationDTO(route.getOrigin().getLongitude(), route.getOrigin().getLatitude(), route.getOrigin().getAddress()),
-                        new LocationDTO(route.getDestination().getLongitude(), route.getDestination().getLatitude(), route.getDestination().getAddress()),
-                        route.getDistance(),
-                        route.getDuration(),
-                        route.getTimesUsed()
-                )).toList();
+                .map(this::mapFavoriteRoute).toList();
 
         return new PageImpl<>(dtos, pageable, favoriteRoutes.size());
     }
 
     @Override
     @Transactional
+    public RouteFromFavoritesResponseDTO addRideRouteToFavorites(
+            Long passengerId, Long rideId) {
+        Passenger passenger = passengerRepository.findById(passengerId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Putnik nije pronađen."));
+        Ride ride = rideRepository.findById(rideId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Vožnja nije pronađena."));
+
+        boolean participated = ride.getRideCreator() != null
+                && ride.getRideCreator().getId().equals(passengerId);
+        if (!participated && ride.getPassengers() != null) {
+            participated = ride.getPassengers().stream()
+                    .anyMatch(value -> value.getId().equals(passengerId));
+        }
+        if (!participated) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN,
+                    "Možete sačuvati samo rutu vožnje u kojoj ste učestvovali.");
+        }
+        if (ride.getStatus() != RideStatus.FINISHED
+                && ride.getStatus() != RideStatus.STOPPED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Ruta se može sačuvati tek nakon završetka vožnje.");
+        }
+        if (ride.getRoute() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Vožnja nema sačuvanu rutu.");
+        }
+
+        List<Route> favorites = safeFavoriteRoutes(passenger);
+        boolean alreadyFavorite = favorites.stream()
+                .anyMatch(route -> route.getId().equals(ride.getRoute().getId()));
+        if (!alreadyFavorite) {
+            favorites.add(ride.getRoute());
+            passengerRepository.save(passenger);
+        }
+        return mapFavoriteRoute(ride.getRoute());
+    }
+
+    @Override
+    @Transactional
     public void removeFromFavoriteRoutes(Long passengerId, Long routeId) {
         // Find passenger from id
-        Passenger passenger = passengerRepository.findById(passengerId).orElseThrow(() -> new RuntimeException("Passenger not found"));
+        Passenger passenger = passengerRepository.findById(passengerId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "Putnik nije pronađen."));
 
-        boolean removed = passenger.getFavoriteRoutes()
-                        .removeIf(route -> route.getId().equals(routeId));
+        safeFavoriteRoutes(passenger).removeIf(route -> route.getId().equals(routeId));
 
         passengerRepository.save(passenger);
+    }
+
+    private List<Route> safeFavoriteRoutes(Passenger passenger) {
+        if (passenger.getFavoriteRoutes() == null) {
+            passenger.setFavoriteRoutes(new ArrayList<>());
+        }
+        return passenger.getFavoriteRoutes();
+    }
+
+    private RouteFromFavoritesResponseDTO mapFavoriteRoute(Route route) {
+        return new RouteFromFavoritesResponseDTO(
+                route.getId(),
+                locationDto(route.getOrigin()),
+                locationDto(route.getDestination()),
+                route.getDistance(),
+                route.getDuration(),
+                route.getTimesUsed(),
+                route.getStops() == null ? List.of()
+                        : route.getStops().stream().map(this::locationDto).toList()
+        );
+    }
+
+    private LocationDTO locationDto(Location location) {
+        return new LocationDTO(location.getLongitude(), location.getLatitude(),
+                location.getAddress());
     }
 
     @Override

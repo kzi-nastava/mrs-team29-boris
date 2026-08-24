@@ -16,6 +16,7 @@ import org.springframework.test.context.TestPropertySource;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @DataJpaTest
 @ActiveProfiles("test")
@@ -88,5 +89,24 @@ public class RideRepositoryTest {
         List<Ride> rides = rideRepository.findAllByPassengerId(creator.getId());
 
         assertFalse(rides.isEmpty());
+    }
+
+    @Test
+    void existsRideParticipantRecognizesRideCreator() {
+        Passenger creator = new Passenger();
+        creator.setEmail("tracking-creator-repository-test@example.com");
+        creator.setPassword("password");
+        creator.setName("Tracking");
+        creator.setSurname("Creator");
+        creator.setGender(com.example.backendspringboot.model.Gender.MALE);
+        creator.setAddress("Test address");
+        creator.setPhone("000000002");
+        entityManager.persistAndFlush(creator);
+
+        Ride ride = new Ride();
+        ride.setRideCreator(creator);
+        ride = rideRepository.saveAndFlush(ride);
+
+        assertTrue(rideRepository.existsRideParticipant(ride.getId(), creator.getId()));
     }
 }

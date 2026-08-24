@@ -8,8 +8,11 @@ import com.example.backendspringboot.model.Review;
 import com.example.backendspringboot.model.Ride;
 import com.example.backendspringboot.model.RideStatus;
 import com.example.backendspringboot.model.Route;
+import com.example.backendspringboot.model.User;
 import com.example.backendspringboot.dto.response.RideTrackingResponseDTO;
 import com.example.backendspringboot.repositories.RideRepository;
+import com.example.backendspringboot.repositories.InconsistencyReportRepository;
+import com.example.backendspringboot.repositories.UserRepository;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.mockito.InjectMocks;
@@ -27,10 +30,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.mock;
 
 @ExtendWith(MockitoExtension.class)
 class RideTrackingAuthorizationTest {
     @Mock RideRepository rideRepository;
+    @Mock InconsistencyReportRepository inconsistencyReportRepository;
+    @Mock UserRepository userRepository;
     @InjectMocks RideServiceImpl service;
 
     @Test
@@ -75,6 +81,8 @@ class RideTrackingAuthorizationTest {
         ride.setRoute(route);
         ride.setStops(List.of(new Location(3L, 19.85, 45.25, "Stanica")));
         when(rideRepository.findById(9L)).thenReturn(Optional.of(ride));
+        when(userRepository.findById(creator.getId())).thenReturn(Optional.of(creator));
+        when(userRepository.findById(linked.getId())).thenReturn(Optional.of(linked));
 
         RideTrackingResponseDTO creatorResponse = service.getRideTracking(9L, creator);
         RideTrackingResponseDTO linkedResponse = service.getRideTracking(9L, linked);
@@ -92,6 +100,31 @@ class RideTrackingAuthorizationTest {
         RideTrackingResponseDTO reviewedResponse = service.getRideTracking(9L, creator);
         assertFalse(reviewedResponse.isCanReview());
         assertTrue(reviewedResponse.isAlreadyReviewed());
+    }
+
+    @Test
+    void databaseParticipantCheckAllowsPassengerWhenDetachedRideRelationsAreUnavailable() {
+        Passenger passenger = passenger(7L);
+        Ride ride = new Ride();
+        ride.setId(13L);
+        ride.setPassengers(List.of());
+        when(rideRepository.findById(13L)).thenReturn(Optional.of(ride));
+        when(rideRepository.existsRideParticipant(13L, 7L)).thenReturn(true);
+
+        assertDoesNotThrow(() -> service.assertCanTrackRide(13L, passenger));
+    }
+
+    @Test
+    void databaseParticipantCheckDoesNotDependOnConcretePrincipalSubclass() {
+        User proxiedPrincipal = mock(User.class);
+        when(proxiedPrincipal.getId()).thenReturn(7L);
+
+        Ride ride = new Ride();
+        ride.setId(12L);
+        when(rideRepository.findById(12L)).thenReturn(Optional.of(ride));
+        when(rideRepository.existsRideParticipant(12L, 7L)).thenReturn(true);
+
+        assertDoesNotThrow(() -> service.assertCanTrackRide(12L, proxiedPrincipal));
     }
 
     private Passenger passenger(long id) {

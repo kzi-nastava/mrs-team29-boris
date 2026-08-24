@@ -31,6 +31,8 @@ import com.example.mobilnaaplikacijatim29.data.model.ActiveVehicleResponse;
 import com.example.mobilnaaplikacijatim29.data.model.BookingLocation;
 import com.example.mobilnaaplikacijatim29.data.model.CreateRideRequest;
 import com.example.mobilnaaplikacijatim29.data.model.LocationResponse;
+import com.example.mobilnaaplikacijatim29.data.model.FavoriteRoute;
+import com.example.mobilnaaplikacijatim29.data.model.PageResponse;
 import com.example.mobilnaaplikacijatim29.data.model.RideBookingResponse;
 import com.example.mobilnaaplikacijatim29.data.model.RoutePreviewRequest;
 import com.example.mobilnaaplikacijatim29.data.model.RoutePreviewResponse;
@@ -172,6 +174,8 @@ public class HomeFragment extends Fragment {
         submitButton = view.findViewById(R.id.booking_submit);
         view.findViewById(R.id.passenger_reports_button).setOnClickListener(v ->
                 ((MainActivity) requireActivity()).navigateTo(R.id.nav_reports));
+        view.findViewById(R.id.booking_favorites_button).setOnClickListener(v ->
+                loadFavoriteRoutes());
         vehicleType.setAdapter(new ArrayAdapter<>(requireContext(),
                 android.R.layout.simple_spinner_dropdown_item,
                 new String[]{"Standardno", "Luksuzno", "Kombi"}));
@@ -228,6 +232,93 @@ public class HomeFragment extends Fragment {
         selectionMode = mode;
         bookingInstruction.setText(instruction);
         showBookingMessage("", false);
+    }
+
+    private void loadFavoriteRoutes() {
+        showBookingMessage("Učitavanje omiljenih ruta...", false);
+        ApiClient.getApi().getFavoriteRoutes(session.getAuthorizationHeader(), 0, 100)
+                .enqueue(new Callback<>() {
+                    @Override public void onResponse(
+                            @NonNull Call<PageResponse<FavoriteRoute>> call,
+                            @NonNull Response<PageResponse<FavoriteRoute>> response) {
+                        if (!isAdded()) return;
+                        if (!response.isSuccessful() || response.body() == null) {
+                            showBookingMessage(errorMessage(response), true);
+                            return;
+                        }
+                        showFavoriteRoutes(response.body().getContent());
+                    }
+
+                    @Override public void onFailure(
+                            @NonNull Call<PageResponse<FavoriteRoute>> call,
+                            @NonNull Throwable throwable) {
+                        if (isAdded()) showBookingMessage("Backend nije dostupan: "
+                                + throwable.getMessage(), true);
+                    }
+                });
+    }
+
+    private void showFavoriteRoutes(List<FavoriteRoute> favorites) {
+        if (favorites.isEmpty()) {
+            showBookingMessage("Nemate sačuvane omiljene rute.", false);
+            return;
+        }
+        String[] labels = new String[favorites.size()];
+        for (int i = 0; i < favorites.size(); i++) {
+            FavoriteRoute route = favorites.get(i);
+            labels[i] = address(route.getOrigin()) + " → " + address(route.getDestination())
+                    + (route.getStops().isEmpty() ? ""
+                    : "\nMeđustanice: " + route.getStops().size());
+        }
+        new AlertDialog.Builder(requireContext())
+                .setTitle("Omiljene rute")
+                .setItems(labels, (dialog, position) -> applyFavoriteRoute(
+                        favorites.get(position)))
+                .setNegativeButton("Odustani", null)
+                .show();
+    }
+
+    private void applyFavoriteRoute(FavoriteRoute route) {
+        if (!valid(route.getOrigin()) || !valid(route.getDestination())) {
+            showBookingMessage("Sačuvana ruta nema ispravne lokacije.", true);
+            return;
+        }
+        origin = bookingLocation(route.getOrigin());
+        destination = bookingLocation(route.getDestination());
+        stops.clear();
+        for (LocationResponse stop : route.getStops()) {
+            if (valid(stop)) stops.add(bookingLocation(stop));
+        }
+        selectionMode = SelectionMode.NONE;
+        bookingInstruction.setText("Omiljena ruta je izabrana. Po potrebi možeš menjati tačke.");
+        bookingPointsChanged();
+        focusBookingRoute();
+    }
+
+    private void focusBookingRoute() {
+        List<GeoPoint> points = bookingPoints();
+        if (points.isEmpty()) return;
+        mapView.post(() -> {
+            if (mapView == null) return;
+            if (points.size() == 1) mapView.getController().animateTo(points.get(0));
+            else mapView.zoomToBoundingBox(BoundingBox.fromGeoPoints(points), true, 80);
+        });
+    }
+
+    private static boolean valid(LocationResponse location) {
+        return location != null && location.getLatitude() != null
+                && location.getLongitude() != null;
+    }
+
+    private static BookingLocation bookingLocation(LocationResponse location) {
+        return new BookingLocation(location.getLongitude(), location.getLatitude(),
+                address(location));
+    }
+
+    private static String address(LocationResponse location) {
+        return location == null || location.getAddress() == null
+                || location.getAddress().isBlank() ? "Nepoznata lokacija"
+                : location.getAddress();
     }
 
     private boolean selectBookingPoint(GeoPoint point) {

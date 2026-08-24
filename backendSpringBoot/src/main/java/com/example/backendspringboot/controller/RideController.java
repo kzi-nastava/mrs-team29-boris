@@ -82,7 +82,8 @@ public class RideController {
                         destination,
                         100,
                         90,
-                        5
+                        5,
+                        List.of()
                 );
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);

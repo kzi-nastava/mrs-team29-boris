@@ -111,6 +111,13 @@ public class MainActivity extends AppCompatActivity {
         bottomNavigation.setOnItemReselectedListener(item -> {
             if (item.getItemId() == R.id.nav_dashboard && dashboardActsAsBack) {
                 navigateBack();
+            } else if (item.getItemId() == R.id.nav_login) {
+                if (sessionManager.isLoggedIn()) {
+                    requestLogout(message ->
+                            Toast.makeText(this, message, Toast.LENGTH_LONG).show());
+                } else {
+                    showDestination(R.id.nav_login, null);
+                }
             }
         });
         getSupportFragmentManager().addOnBackStackChangedListener(

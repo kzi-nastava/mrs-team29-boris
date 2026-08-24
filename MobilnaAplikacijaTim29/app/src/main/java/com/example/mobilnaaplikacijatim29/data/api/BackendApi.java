@@ -53,6 +53,7 @@ import com.example.mobilnaaplikacijatim29.data.model.ScheduledRide;
 import com.example.mobilnaaplikacijatim29.data.model.StartRideRequest;
 import com.example.mobilnaaplikacijatim29.data.model.RideReviewRequest;
 import com.example.mobilnaaplikacijatim29.data.model.InconsistencyReportRequest;
+import com.example.mobilnaaplikacijatim29.data.model.FavoriteRoute;
 
 public interface BackendApi {
 
@@ -103,6 +104,22 @@ public interface BackendApi {
             @Header("Authorization") String authorization,
             @Path("id") long rideId,
             @Body InconsistencyReportRequest request);
+
+    @GET("api/passenger/me/favorite-routes")
+    Call<PageResponse<FavoriteRoute>> getFavoriteRoutes(
+            @Header("Authorization") String authorization,
+            @Query("page") int page,
+            @Query("size") int size);
+
+    @POST("api/passenger/me/favorite-routes/rides/{rideId}")
+    Call<FavoriteRoute> addFavoriteRoute(
+            @Header("Authorization") String authorization,
+            @Path("rideId") long rideId);
+
+    @DELETE("api/passenger/me/favorite-routes/{routeId}")
+    Call<Void> removeFavoriteRoute(
+            @Header("Authorization") String authorization,
+            @Path("routeId") long routeId);
 
     @GET("api/chat/support/messages")
     Call<List<SupportMessage>> getSupportMessages(

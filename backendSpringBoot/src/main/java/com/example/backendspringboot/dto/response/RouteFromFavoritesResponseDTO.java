@@ -6,6 +6,8 @@ import lombok.Getter;
 import lombok.NoArgsConstructor;
 import lombok.Setter;
 
+import java.util.List;
+
 @Getter
 @Setter
 @NoArgsConstructor
@@ -17,4 +19,5 @@ public class RouteFromFavoritesResponseDTO {
     private double distance;
     private int duration;
     private int timesUsed;
+    private List<LocationDTO> stops;
 }

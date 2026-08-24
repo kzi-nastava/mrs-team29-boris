@@ -77,15 +77,7 @@ public class LoginFragment extends Fragment {
                                                @NonNull Response<LoginResponse> response) {
                             setLoading(false, progress, submit);
                             if (!response.isSuccessful() || response.body() == null) {
-                                if (response.code() == 401) {
-                                    showError(errorView, "Email ili lozinka nisu ispravni.");
-                                } else if (response.code() == 403) {
-                                    showError(errorView, "Nalog nije aktiviran ili registracija "
-                                            + "nije završena. Proverite email.");
-                                } else {
-                                    showError(errorView, "Prijava nije uspela (HTTP "
-                                            + response.code() + "). Pokušajte ponovo.");
-                                }
+                                showError(errorView, "Login failed");
                                 return;
                             }
 
@@ -98,7 +90,7 @@ public class LoginFragment extends Fragment {
                         public void onFailure(@NonNull Call<LoginResponse> call,
                                               @NonNull Throwable throwable) {
                             setLoading(false, progress, submit);
-                            showError(errorView, "Backend nije dostupan: " + throwable.getMessage());
+                            showError(errorView, "Login failed");
                         }
                     });
         });
